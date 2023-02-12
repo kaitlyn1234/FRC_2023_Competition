@@ -16,6 +16,7 @@ import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.cameraserver.CameraServer;
 
+import edu.wpi.first.math.controller.PIDController;
 
 
 /**
@@ -43,10 +44,13 @@ public class Robot extends TimedRobot {
   CANSparkMax grabber_pivot = new CANSparkMax(8, MotorType.kBrushless);;
   CANSparkMax grabber_arms = new CANSparkMax(9, MotorType.kBrushless);;
 
+  PIDController extension_vel_pid = new PIDController(0.00, 0.4, 0.0);
+  PIDController lift_pivot_group_vel_pid = new PIDController(0.00, 0.1, 0.0);
+
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
-  private final MotorControllerGroup lift_pivot_Group = new MotorControllerGroup(right_lift_motor, left_lift_motor);
+  private final MotorControllerGroup lift_pivot_group = new MotorControllerGroup(right_lift_motor, left_lift_motor);
   DifferentialDrive differential_drive = new DifferentialDrive(left_Motor_Group, right_Motor_Group);
 
   Joystick logitechController = new Joystick(0);
@@ -58,8 +62,8 @@ public class Robot extends TimedRobot {
   final int EXTENSION_BUTTON_OUT = 4;
   final int GRABBER_ARMS_BUTTON_OUT = 5;
   final int GRABBER_ARMS_BUTTON_IN = 6;
-  final int GRABBER_PIVOT_BUTTON_DOWN = 9;
-  final int GRABBER_PIVOT_BUTTON_UP = 10;
+  final int GRABBER_PIVOT_BUTTON_DOWN = 7;
+  final int GRABBER_PIVOT_BUTTON_UP = 8;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -73,6 +77,9 @@ public class Robot extends TimedRobot {
     CameraServer.startAutomaticCapture();
     left_lift_motor.setInverted(true);
     SmartDashboard.putData("Auto choices", m_chooser);
+
+    extension_vel_pid.setIntegratorRange(-0.4, 0.4);
+    lift_pivot_group_vel_pid.setIntegratorRange(-0.4, 0.4);
   }
 
   /**
@@ -127,33 +134,46 @@ public class Robot extends TimedRobot {
 
 
 //  LIFT PIVOT
+    double lift_pivot_group_setpoint = 0;
     if (logitechController.getRawButton(LIFT_BUTTON_UP)) {
-      lift_pivot_Group.set(.05);
+      //lift_pivot_Group.set(.05);
+      lift_pivot_group_setpoint = .05;
     }
     else if (logitechController.getRawButton(LIFT_BUTTON_DOWN)) {
-      lift_pivot_Group.set(-.05);}
-    
-    else {
-      lift_pivot_Group.set(0);
+      //lift_pivot_Group.set(-.05);
+      lift_pivot_group_setpoint = -.05;
     }
+    else {
+      //lift_pivot_Group.set(0);
+      lift_pivot_group_setpoint = 0;
+    }
+    double ratio1 = 60 * 100;
+
+    lift_pivot_group.set(lift_pivot_group_vel_pid.calculate(right_lift_motor.getEncoder().getVelocity() / ratio1, lift_pivot_group_setpoint));
 
 //  EXTENSION
+    double extension_setpoint = 0;
     if (logitechController.getRawButton(EXTENSION_BUTTON_OUT)) {
-      extension.set(.1);
+      //extension.set(.15);
+      extension_setpoint = .25;
     }
     else if (logitechController.getRawButton(EXTENSION_BUTTON_IN)) {
-      extension.set(-.1);
+      //extension.set(-.15);
+      extension_setpoint = -.25;
     }
     else {
-      extension.set(0);
+      extension_setpoint = 0;
     }
+    double ratio = 60 * 5;
+
+    extension.set(extension_vel_pid.calculate(extension.getEncoder().getVelocity() / ratio, extension_setpoint));
 
 // GRABBER PIVOT
     if (logitechController.getRawButton(GRABBER_PIVOT_BUTTON_DOWN)) {
-      grabber_pivot.set(.1);
+      grabber_pivot.set(.25);
     }
     else if (logitechController.getRawButton(GRABBER_PIVOT_BUTTON_UP)) {
-      grabber_pivot.set(-.1);
+      grabber_pivot.set(-.25);
     }
     else {
       grabber_pivot.set(0);
