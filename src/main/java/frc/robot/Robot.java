@@ -48,6 +48,18 @@ public class Robot extends TimedRobot {
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
+  // Control velocity of drivetrain wheels
+  PIDController left_drivetrain_vel_pid = new PIDController(1, 0.5, 0.0);
+  PIDController right_drivetrain_vel_pid = new PIDController(1, 0.5, 0.0);
+
+  final double ticks_per_meter = 1; // We need to calculate this value (number of encoder ticks per meter of linear travel of wheels)
+  final double wheel_base_width = 1; // We need to measure the distance between the left and right wheels
+
+  // Control yaw of the robot
+  PIDController drivetrain_yaw_pos_pid = new PIDController(1.0, 0.0, 0.0);
+
+  // Positional PID used for charge station alignment
+  PIDController drivetrain_leveling_pid = new PIDController(1.0, 0.0, 0.0);
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -76,7 +88,11 @@ public class Robot extends TimedRobot {
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
-  //AHRS ahrs;
+  enum DrivetrainMode { AutoLevel, Normal }
+
+  DrivetrainMode drivetrain_mode = DrivetrainMode.Normal;
+
+  AHRS ahrs;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -90,11 +106,14 @@ public class Robot extends TimedRobot {
     CameraServer.startAutomaticCapture();
     left_lift_motor.setInverted(true);
     SmartDashboard.putData("Auto choices", m_chooser);
-    //ahrs = new AHRS(SPI.Port.kMXP);
+    ahrs = new AHRS(SPI.Port.kMXP);
 
     extension_vel_pid.setIntegratorRange(-0.2, 0.2);
     lift_pivot_group_vel_pid.setIntegratorRange(-0.2, 0.2);
     grabber_pivot_vel_pid.setIntegratorRange(-0.2, 0.2);
+
+    // See: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/controllers/pidcontroller.html#setting-continuous-input
+    drivetrain_yaw_pos_pid.enableContinuousInput(-Math.PI, Math.PI);
   }
 
   /**
@@ -207,8 +226,51 @@ public class Robot extends TimedRobot {
       grabber_arms.set(0);
     }
 
-    differential_drive.arcadeDrive(stick.getY(), stick.getX());
-}
+    if (false /* TODO: INSERT BUTTON TO ENTER AUTO LEVEL CONTROL MODE */) {
+      drivetrain_mode = DrivetrainMode.AutoLevel;
+      ahrs.zeroYaw();
+    } else if (false /* TODO: INSERT BUTTON TO EXIT AUTO LEVEL CONTROL MODE */) {
+      drivetrain_mode = DrivetrainMode.Normal;
+    }
+
+    if (drivetrain_mode == DrivetrainMode.Normal) {
+      controlDrivetrain(stick.getY(), stick.getX());
+    }
+    else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
+      autoLevel();
+    }
+  }
+
+  public void autoLevel() {
+
+    // We always want zero pitch. Note: this is assuming 90 rotation of roborio
+    double linear_velocity_setpoint = drivetrain_leveling_pid.calculate(0.0, ahrs.getRoll());
+
+    // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(0.0, ahrs.getYaw());
+
+    // Control the drivetrain with these velocities
+    controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
+  }
+
+  public void controlDrivetrain(double linear_velocity, double angular_velocity) {
+    // The setpoints are in encoder ticks per second. We need to convert linear and angular
+    // velocities to encoder ticks per second on each side of the drivetrain.
+    double wheel_base_radius = wheel_base_width / 2;
+
+    double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
+    double angular_ticks_per_sec = (angular_velocity / wheel_base_radius) * ticks_per_meter;
+
+    double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
+    double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
+
+    // Assuming encoder is attached to front motor on each side - will need to change if not.
+    double left_cmd = left_drivetrain_vel_pid.calculate(left_setpoint, left_motor_front.getSelectedSensorVelocity());
+    double right_cmd = right_drivetrain_vel_pid.calculate(right_setpoint, right_motor_front.getSelectedSensorVelocity());
+
+    differential_drive.tankDrive(left_cmd, right_cmd);
+  }
+
 
   /** This function is called once when the robot is disabled. */
   @Override
