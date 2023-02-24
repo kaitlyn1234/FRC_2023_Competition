@@ -44,9 +44,9 @@ public class Robot extends TimedRobot {
   CANSparkMax grabber_pivot = new CANSparkMax(8, MotorType.kBrushless);;
   CANSparkMax grabber_arms = new CANSparkMax(9, MotorType.kBrushless);;
 
-  PIDController extension_vel_pid = new PIDController(0.15, 0.3, 0.0);
-  PIDController lift_pivot_group_vel_pid = new PIDController(0.9, 2.0, 0.0);
-  PIDController grabber_pivot_vel_pid = new PIDController(0.1, 0.2, 0.0);
+  PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
+  PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
+  PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
@@ -67,6 +67,10 @@ public class Robot extends TimedRobot {
   final int GRABBER_PIVOT_BUTTON_DOWN = 7;
   final int GRABBER_PIVOT_BUTTON_UP = 8;
 
+  final double grabber_pivot_max_setpoint = .2;
+  final double lift_pivot_group_max_setpoint = .1;
+  final double joystick_deadband_constant= .05;
+  final double extension_max_setpoint = .5;
 
   final double grabber_pivot_gear_ratio = 60 * 37.66;
   final double extension_gear_ratio = 60.0 * 27.35;
@@ -102,14 +106,14 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    System.out.println("pivot 1 temp: " + right_lift_motor.getMotorTemperature());
-    System.out.println("pivot 2 temp: " + left_lift_motor.getMotorTemperature());
-    System.out.println("extension temp: " + extension.getMotorTemperature());
-    System.out.println("grabber pivot temp: " + grabber_pivot.getMotorTemperature());
-    System.out.println("right pivot current: " + right_lift_motor.getOutputCurrent());
-    System.out.println("lift pivot current: " + left_lift_motor.getOutputCurrent());
-    System.out.println("grabber pivot current: " + grabber_pivot.getOutputCurrent());
-    System.out.println("extension current: " + extension.getOutputCurrent());
+    System.out.println("rpt " + right_lift_motor.getMotorTemperature());
+    System.out.println("lpt " + left_lift_motor.getMotorTemperature());
+    System.out.println("et " + extension.getMotorTemperature());
+    System.out.println("GPt " + grabber_pivot.getMotorTemperature());
+    // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
+    // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
+    // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
+    // System.out.println("exc " + extension.getOutputCurrent());
     //System.out.println(ahrs.getRoll());
   }
 
@@ -154,17 +158,12 @@ public class Robot extends TimedRobot {
   {
 
 //  LIFT PIVOT
-    double lift_pivot_group_setpoint = 0;
-    if (logitechController.getRawButton(LIFT_BUTTON_UP)) {
-      lift_pivot_group_setpoint = 0.1;
-    }
-    else if (logitechController.getRawButton(LIFT_BUTTON_DOWN)) {
-      lift_pivot_group_setpoint = -0.1;
-    }
-    else {
+    double lift_pivot_group_setpoint = logitechController.getRawAxis(5);
+    if (Math.abs(lift_pivot_group_setpoint) < joystick_deadband_constant) {
       lift_pivot_group_setpoint = 0;
     }
-   
+    lift_pivot_group_setpoint = lift_pivot_group_setpoint * lift_pivot_group_max_setpoint;
+
     if (left_lift_motor.getMotorTemperature() > 100 || right_lift_motor.getMotorTemperature() > 100) {
       lift_pivot_group.set(0);
     }
@@ -173,16 +172,11 @@ public class Robot extends TimedRobot {
     }
 
 //  EXTENSION
-    double extension_setpoint = 0;
-    if (logitechController.getRawButton(EXTENSION_BUTTON_OUT)) {
-      extension_setpoint = 1;
-    }
-    else if (logitechController.getRawButton(EXTENSION_BUTTON_IN)) {
-      extension_setpoint = -1;
-    }
-    else {
+    double extension_setpoint = logitechController.getRawAxis(3) - logitechController.getRawAxis(2);
+    if (Math.abs(extension_setpoint) < joystick_deadband_constant) {
       extension_setpoint = 0;
     }
+    extension_setpoint = extension_setpoint * extension_max_setpoint;
 
     if (extension.getMotorTemperature() > 100) {
       extension.set(0);
@@ -191,32 +185,26 @@ public class Robot extends TimedRobot {
     }
 
 // GRABBER PIVOT
-  double grabber_pivot_setpoint = 0;
-    if (logitechController.getRawButton(GRABBER_PIVOT_BUTTON_DOWN)) {
-      grabber_pivot_setpoint = .2;
-    }
-    else if (logitechController.getRawButton(GRABBER_PIVOT_BUTTON_UP)) {
-      grabber_pivot_setpoint = -.2;
-    }
-    else {
+    double grabber_pivot_setpoint = -logitechController.getRawAxis(1);
+    if (Math.abs(grabber_pivot_setpoint) < joystick_deadband_constant) {
       grabber_pivot_setpoint = 0;
     }
+    grabber_pivot_setpoint = grabber_pivot_setpoint * grabber_pivot_max_setpoint;
 
     if (grabber_pivot.getMotorTemperature() > 100) {
       grabber_pivot.set(0);
     } else {
       grabber_pivot.set(grabber_pivot_vel_pid.calculate (grabber_pivot.getEncoder(). getVelocity() / grabber_pivot_gear_ratio, grabber_pivot_setpoint));
     }
-
 // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
-      grabber_arms.set(-0.1);
+      grabber_arms.set(-0.2);
     }
     else if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_IN)) {
-      grabber_arms.set(0.1);
+      grabber_arms.set(0.5);
     }
     else{
-      grabber_arms.set(0.05);
+      grabber_arms.set(0);
     }
 
     differential_drive.arcadeDrive(stick.getY(), stick.getX());
