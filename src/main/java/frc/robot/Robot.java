@@ -254,6 +254,8 @@ public class Robot extends TimedRobot {
   }
 
   public void controlDrivetrain(double linear_velocity, double angular_velocity) {
+    // The setpoints are in encoder ticks per second. We need to convert linear and angular
+    // velocities to encoder ticks per second on each side of the drivetrain.
     double wheel_base_radius = wheel_base_width / 2;
 
     double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
