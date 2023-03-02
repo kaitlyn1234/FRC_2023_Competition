@@ -129,6 +129,7 @@ public class Robot extends TimedRobot {
     System.out.println("lpt " + left_lift_motor.getMotorTemperature());
     System.out.println("et " + extension.getMotorTemperature());
     System.out.println("GPt " + grabber_pivot.getMotorTemperature());
+    System.out.println("gat " + grabber_arms.getMotorTemperature());
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
@@ -217,10 +218,10 @@ public class Robot extends TimedRobot {
     }
 // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
-      grabber_arms.set(-0.2);
+      grabber_arms.set(-0.1);
     }
     else if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_IN)) {
-      grabber_arms.set(0.5);
+      grabber_arms.set(0.2);
     }
     else{
       grabber_arms.set(0);
