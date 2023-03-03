@@ -56,10 +56,10 @@ public class Robot extends TimedRobot {
   final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
 
   // Control yaw of the robot
-  PIDController drivetrain_yaw_pos_pid = new PIDController(1.0, 0.0, 0.0);
+  PIDController drivetrain_yaw_pos_pid = new PIDController(0.15, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
-  PIDController drivetrain_leveling_pid = new PIDController(1.0, 0.0, 0.0);
+  PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.05, 0.0);
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -114,6 +114,8 @@ public class Robot extends TimedRobot {
 
     left_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
     right_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
+    
+    drivetrain_leveling_pid.setIntegratorRange(-0.2, 0.2);
 
     // See: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/controllers/pidcontroller.html#setting-continuous-input
     drivetrain_yaw_pos_pid.enableContinuousInput(-Math.PI, Math.PI);
@@ -140,7 +142,7 @@ public class Robot extends TimedRobot {
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
     // System.out.println("exc " + extension.getOutputCurrent());
-    //System.out.println(ahrs.getRoll());
+    System.out.println(ahrs.getRoll());
   }
 
   /**
@@ -241,8 +243,7 @@ public class Robot extends TimedRobot {
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      //controlDrivetrain(-stick.getY(), -stick.getX());
-      differential_drive.tankDrive(-stick.getY(), -stick.getX());
+      controlDrivetrain(-stick.getY(), -stick.getX());
     }
     else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
       autoLevel();
@@ -254,11 +255,17 @@ public class Robot extends TimedRobot {
     // We always want zero pitch. Note: this is assuming 90 rotation of roborio
     double linear_velocity_setpoint = drivetrain_leveling_pid.calculate(0.0, ahrs.getRoll());
 
+    if (linear_velocity_setpoint > 0.85) { linear_velocity_setpoint = 0.85; }
+    if (linear_velocity_setpoint < -0.85) { linear_velocity_setpoint = -0.85; }
+
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
     double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(0.0, ahrs.getYaw());
 
+    if (angular_velocity_setpoint > 2.0) { angular_velocity_setpoint = 2.0; }
+    if (angular_velocity_setpoint < -2.0) { angular_velocity_setpoint = -2.0; }
+
     // Control the drivetrain with these velocities
-    controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
+    controlDrivetrain(-linear_velocity_setpoint, angular_velocity_setpoint);
   }
 
   public void controlDrivetrain(double linear_velocity, double angular_velocity) {
@@ -267,16 +274,19 @@ public class Robot extends TimedRobot {
     double wheel_base_radius = wheel_base_width / 2;
 
     double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
-    double angular_ticks_per_sec = angular_velocity * wheel_base_radius * ticks_per_meter;
+    double angular_ticks_per_sec = 2.0 * angular_velocity * wheel_base_radius * ticks_per_meter;
 
     double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
     double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
 
     // Assuming encoder is attached to front motor on each side - will need to change if not.
-    double left_cmd = left_drivetrain_vel_pid.calculate(left_setpoint, left_motor_front.getSelectedSensorVelocity());
-    double right_cmd = right_drivetrain_vel_pid.calculate(right_setpoint, -right_motor_front.getSelectedSensorVelocity());
+    double left_cmd = left_setpoint / 150.0; //left_drivetrain_vel_pid.calculate(left_setpoint, left_motor_front.getSelectedSensorVelocity());
+    double right_cmd = right_setpoint / 150.0;//right_drivetrain_vel_pid.calculate(right_setpoint, -right_motor_front.getSelectedSensorVelocity());
 
-    differential_drive.tankDrive(left_cmd, right_cmd);
+    System.out.println("left_cmd" + left_cmd);
+    System.out.println("right_cmd" + right_cmd);
+
+    differential_drive.tankDrive(-left_cmd, -right_cmd);
   }
 
 
