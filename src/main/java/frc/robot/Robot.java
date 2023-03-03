@@ -18,6 +18,7 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.controller.PIDController;
 import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Timer;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -29,6 +30,7 @@ public class Robot extends TimedRobot {
   private static final String kDefaultAuto = "Default";
   private static final String kCustomAuto = "My Auto";
   private String m_autoSelected;
+  
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
 // DRIVE TRAIN MOTORS
@@ -48,7 +50,6 @@ public class Robot extends TimedRobot {
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
-
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
   private final MotorControllerGroup lift_pivot_group = new MotorControllerGroup(right_lift_motor, left_lift_motor);
@@ -56,7 +57,8 @@ public class Robot extends TimedRobot {
 
   Joystick logitechController = new Joystick(0);
   Joystick stick = new Joystick(1);
-
+  
+  Timer timer = new Timer();
 
   final int LIFT_BUTTON_DOWN = 1;
   final int LIFT_BUTTON_UP = 2;
@@ -140,12 +142,20 @@ public class Robot extends TimedRobot {
   public void autonomousPeriodic() {
     switch (m_autoSelected) {
       case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+      differential_drive.feedWatchdog();
+      // Put custom auto code here
+  
+      if (timer.hasElapsed(4.0)) {
+        // don't run
+        left_Motor_Group.set(0.0);
+        right_Motor_Group.set(0.0);
+      }
+      else {
+        // run
+        left_Motor_Group.set(0.3);
+        right_Motor_Group.set(0.3);
+      
+      }
     }
   }
 
