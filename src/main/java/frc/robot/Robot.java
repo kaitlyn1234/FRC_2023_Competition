@@ -49,11 +49,11 @@ public class Robot extends TimedRobot {
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
-  PIDController left_drivetrain_vel_pid = new PIDController(1, 0.5, 0.0);
-  PIDController right_drivetrain_vel_pid = new PIDController(1, 0.5, 0.0);
+  PIDController left_drivetrain_vel_pid = new PIDController(0.000, 0.02, 0.0);
+  PIDController right_drivetrain_vel_pid = new PIDController(0.000, 0.02, 0.0);
 
-  final double ticks_per_meter = 1; // We need to calculate this value (number of encoder ticks per meter of linear travel of wheels)
-  final double wheel_base_width = 1; // We need to measure the distance between the left and right wheels
+  final double ticks_per_meter = 102.55; // We need to calculate this value (number of encoder ticks per meter of linear travel of wheels)
+  final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
 
   // Control yaw of the robot
   PIDController drivetrain_yaw_pos_pid = new PIDController(1.0, 0.0, 0.0);
@@ -112,6 +112,9 @@ public class Robot extends TimedRobot {
     lift_pivot_group_vel_pid.setIntegratorRange(-0.2, 0.2);
     grabber_pivot_vel_pid.setIntegratorRange(-0.2, 0.2);
 
+    left_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
+    right_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
+
     // See: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/controllers/pidcontroller.html#setting-continuous-input
     drivetrain_yaw_pos_pid.enableContinuousInput(-Math.PI, Math.PI);
   }
@@ -125,11 +128,14 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    System.out.println("rpt " + right_lift_motor.getMotorTemperature());
-    System.out.println("lpt " + left_lift_motor.getMotorTemperature());
-    System.out.println("et " + extension.getMotorTemperature());
+   // System.out.println("rpt " + right_lift_motor.getMotorTemperature());
+   // System.out.println("lpt " + left_lift_motor.getMotorTemperature());
+   // System.out.println("et " + extension.getMotorTemperature());
     System.out.println("GPt " + grabber_pivot.getMotorTemperature());
     System.out.println("gat " + grabber_arms.getMotorTemperature());
+    System.out.println("lvel" + left_motor_front.getSelectedSensorVelocity());
+    System.out.println("rvel" + right_motor_front.getSelectedSensorVelocity());
+
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
@@ -227,15 +233,15 @@ public class Robot extends TimedRobot {
       grabber_arms.set(0);
     }
 
-    if (false /* TODO: INSERT BUTTON TO ENTER AUTO LEVEL CONTROL MODE */) {
+    if (false) {
       drivetrain_mode = DrivetrainMode.AutoLevel;
       ahrs.zeroYaw();
-    } else if (false /* TODO: INSERT BUTTON TO EXIT AUTO LEVEL CONTROL MODE */) {
+    } else if (true) {
       drivetrain_mode = DrivetrainMode.Normal;
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      controlDrivetrain(stick.getY(), stick.getX());
+      controlDrivetrain(-stick.getY(), -stick.getX());
     }
     else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
       autoLevel();
@@ -260,14 +266,14 @@ public class Robot extends TimedRobot {
     double wheel_base_radius = wheel_base_width / 2;
 
     double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
-    double angular_ticks_per_sec = (angular_velocity / wheel_base_radius) * ticks_per_meter;
+    double angular_ticks_per_sec = angular_velocity * wheel_base_radius * ticks_per_meter;
 
     double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
     double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
 
     // Assuming encoder is attached to front motor on each side - will need to change if not.
     double left_cmd = left_drivetrain_vel_pid.calculate(left_setpoint, left_motor_front.getSelectedSensorVelocity());
-    double right_cmd = right_drivetrain_vel_pid.calculate(right_setpoint, right_motor_front.getSelectedSensorVelocity());
+    double right_cmd = right_drivetrain_vel_pid.calculate(right_setpoint, -right_motor_front.getSelectedSensorVelocity());
 
     differential_drive.tankDrive(left_cmd, right_cmd);
   }
