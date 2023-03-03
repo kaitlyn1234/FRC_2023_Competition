@@ -241,7 +241,8 @@ public class Robot extends TimedRobot {
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      controlDrivetrain(-stick.getY(), -stick.getX());
+      //controlDrivetrain(-stick.getY(), -stick.getX());
+      differential_drive.tankDrive(-stick.getY(), -stick.getX());
     }
     else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
       autoLevel();
