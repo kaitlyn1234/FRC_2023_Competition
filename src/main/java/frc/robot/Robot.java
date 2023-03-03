@@ -233,10 +233,10 @@ public class Robot extends TimedRobot {
       grabber_arms.set(0);
     }
 
-    if (false) {
+    if (logitechController.getRawButton (7)) {
       drivetrain_mode = DrivetrainMode.AutoLevel;
       ahrs.zeroYaw();
-    } else if (true) {
+    } else if (logitechController.getRawButton(8)) {
       drivetrain_mode = DrivetrainMode.Normal;
     }
 
