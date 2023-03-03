@@ -49,10 +49,10 @@ public class Robot extends TimedRobot {
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
-  PIDController left_drivetrain_vel_pid = new PIDController(0.000, 0.02, 0.0);
-  PIDController right_drivetrain_vel_pid = new PIDController(0.000, 0.02, 0.0);
+  PIDController left_drivetrain_vel_pid = new PIDController(0.001, 0.02, 0.0);
+  PIDController right_drivetrain_vel_pid = new PIDController(0.001, 0.02, 0.0);
 
-  final double ticks_per_meter = 102.55; // We need to calculate this value (number of encoder ticks per meter of linear travel of wheels)
+  final double ticks_per_meter = 447.388; // 1/( (1/10.71) * 2 * Math.PI * 0.0762 * (1/20));
   final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
 
   // Control yaw of the robot
@@ -60,6 +60,10 @@ public class Robot extends TimedRobot {
 
   // Positional PID used for charge station alignment
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.05, 0.0);
+
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.1;
+  final double AUTO_LEVEL_MAX_ANG_VEL = 0.5;
+  final double AUTO_LEVEL_DEADBAND_ANG = 0.0; // no deadband for now
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -69,6 +73,13 @@ public class Robot extends TimedRobot {
   Joystick logitechController = new Joystick(0);
   Joystick stick = new Joystick(1);
 
+  final double VELOCITY_CALCULATION_DT = 0.1;
+
+  double left_drivetrain_prev_pos = 0;
+  double right_drivetrain_prev_pos = 0;
+
+  double left_drivetrain_vel = 0;
+  double right_drivetrain_vel = 0;
 
   final int LIFT_BUTTON_DOWN = 1;
   final int LIFT_BUTTON_UP = 2;
@@ -112,22 +123,28 @@ public class Robot extends TimedRobot {
     lift_pivot_group_vel_pid.setIntegratorRange(-0.2, 0.2);
     grabber_pivot_vel_pid.setIntegratorRange(-0.2, 0.2);
 
-    left_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
-    right_drivetrain_vel_pid.setIntegratorRange(-1.0, 1.0);
+    left_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
+    right_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
     
     drivetrain_leveling_pid.setIntegratorRange(-0.2, 0.2);
 
     // See: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/controllers/pidcontroller.html#setting-continuous-input
     drivetrain_yaw_pos_pid.enableContinuousInput(-Math.PI, Math.PI);
+
+    
+    addPeriodic(() -> {
+      final double left_current_pos = left_motor_front.getSelectedSensorPosition();
+      final double right_current_pos = right_motor_front.getSelectedSensorPosition();
+
+      left_drivetrain_vel = (left_current_pos - left_drivetrain_prev_pos) / VELOCITY_CALCULATION_DT;
+      right_drivetrain_vel = (right_current_pos - right_drivetrain_prev_pos) / VELOCITY_CALCULATION_DT;
+
+      left_drivetrain_prev_pos = left_current_pos;
+      right_drivetrain_prev_pos = right_current_pos;
+      
+    }, VELOCITY_CALCULATION_DT, 0.005);
   }
 
-  /**
-   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
-   * that you want ran during disabled, autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before LiveWindow and
-   * SmartDashboard integrated updating.
-   */
   @Override
   public void robotPeriodic() {
    // System.out.println("rpt " + right_lift_motor.getMotorTemperature());
@@ -135,14 +152,17 @@ public class Robot extends TimedRobot {
    // System.out.println("et " + extension.getMotorTemperature());
     System.out.println("GPt " + grabber_pivot.getMotorTemperature());
     System.out.println("gat " + grabber_arms.getMotorTemperature());
-    System.out.println("lvel" + left_motor_front.getSelectedSensorVelocity());
-    System.out.println("rvel" + right_motor_front.getSelectedSensorVelocity());
+    System.out.println("lvel" + left_drivetrain_vel);
+    System.out.println("rvel" + right_drivetrain_vel);
+
+    System.out.println("joyx" + stick.getX());
+    System.out.println("joyy" + stick.getY());
 
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
     // System.out.println("exc " + extension.getOutputCurrent());
-    System.out.println(ahrs.getRoll());
+    //System.out.println(ahrs.getRoll());
   }
 
   /**
@@ -185,7 +205,7 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() 
   {
 
-//  LIFT PIVOT
+    //  LIFT PIVOT
     double lift_pivot_group_setpoint = logitechController.getRawAxis(5);
     if (Math.abs(lift_pivot_group_setpoint) < joystick_deadband_constant) {
       lift_pivot_group_setpoint = 0;
@@ -199,7 +219,7 @@ public class Robot extends TimedRobot {
       lift_pivot_group.set(lift_pivot_group_vel_pid.calculate(right_lift_motor.getEncoder().getVelocity() / lift_pivot_group_gear_ratio, lift_pivot_group_setpoint));
     }
 
-//  EXTENSION
+    //  EXTENSION
     double extension_setpoint = logitechController.getRawAxis(3) - logitechController.getRawAxis(2);
     if (Math.abs(extension_setpoint) < joystick_deadband_constant) {
       extension_setpoint = 0;
@@ -212,7 +232,7 @@ public class Robot extends TimedRobot {
       extension.set(extension_vel_pid.calculate(extension.getEncoder().getVelocity() / extension_gear_ratio, extension_setpoint));
     }
 
-// GRABBER PIVOT
+    // GRABBER PIVOT
     double grabber_pivot_setpoint = -logitechController.getRawAxis(1);
     if (Math.abs(grabber_pivot_setpoint) < joystick_deadband_constant) {
       grabber_pivot_setpoint = 0;
@@ -224,7 +244,7 @@ public class Robot extends TimedRobot {
     } else {
       grabber_pivot.set(grabber_pivot_vel_pid.calculate (grabber_pivot.getEncoder(). getVelocity() / grabber_pivot_gear_ratio, grabber_pivot_setpoint));
     }
-// GRABBER ARMS
+    // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
       grabber_arms.set(-0.1);
     }
@@ -251,18 +271,24 @@ public class Robot extends TimedRobot {
   }
 
   public void autoLevel() {
+    double pitch = ahrs.getRoll();
+    double linear_velocity_setpoint = 0;
+    // Add a deadband to only control if angle is larger than threshold
+    if (Math.abs(pitch) > AUTO_LEVEL_DEADBAND_ANG) {
+      // We always want zero pitch. Note: this is assuming 90 rotation of roborio
+      linear_velocity_setpoint = drivetrain_leveling_pid.calculate(0.0, pitch);
+    }
 
-    // We always want zero pitch. Note: this is assuming 90 rotation of roborio
-    double linear_velocity_setpoint = drivetrain_leveling_pid.calculate(0.0, ahrs.getRoll());
-
-    if (linear_velocity_setpoint > 0.85) { linear_velocity_setpoint = 0.85; }
-    if (linear_velocity_setpoint < -0.85) { linear_velocity_setpoint = -0.85; }
+    // Clamp linear velocity output
+    if (linear_velocity_setpoint > AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = AUTO_LEVEL_MAX_LIN_VEL; }
+    if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
     double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(0.0, ahrs.getYaw());
 
-    if (angular_velocity_setpoint > 2.0) { angular_velocity_setpoint = 2.0; }
-    if (angular_velocity_setpoint < -2.0) { angular_velocity_setpoint = -2.0; }
+    // Clamp angular velocity output
+    if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
+    if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
 
     // Control the drivetrain with these velocities
     controlDrivetrain(-linear_velocity_setpoint, angular_velocity_setpoint);
@@ -274,19 +300,27 @@ public class Robot extends TimedRobot {
     double wheel_base_radius = wheel_base_width / 2;
 
     double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
-    double angular_ticks_per_sec = 2.0 * angular_velocity * wheel_base_radius * ticks_per_meter;
+    double angular_ticks_per_sec = angular_velocity * wheel_base_radius * ticks_per_meter;
 
     double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
     double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
 
-    // Assuming encoder is attached to front motor on each side - will need to change if not.
-    double left_cmd = left_setpoint / 150.0; //left_drivetrain_vel_pid.calculate(left_setpoint, left_motor_front.getSelectedSensorVelocity());
-    double right_cmd = right_setpoint / 150.0;//right_drivetrain_vel_pid.calculate(right_setpoint, -right_motor_front.getSelectedSensorVelocity());
+    // Calculate a feedforward command based on max freerunning velocity
+    double left_cmd_ff = left_setpoint / 700.0;
+    double right_cmd_ff = right_setpoint / 700.0;
+
+    // Calculate feedback term to compensate for error
+    // encoders might need to be negated differently 
+    double left_cmd_fb = left_drivetrain_vel_pid.calculate(left_setpoint, left_drivetrain_vel);
+    double right_cmd_fb = right_drivetrain_vel_pid.calculate(right_setpoint, -right_drivetrain_vel);
+    
+    double left_cmd = left_cmd_ff + left_cmd_fb;
+    double right_cmd = right_cmd_ff + right_cmd_fb;
 
     System.out.println("left_cmd" + left_cmd);
     System.out.println("right_cmd" + right_cmd);
 
-    differential_drive.tankDrive(-left_cmd, -right_cmd);
+    differential_drive.tankDrive(left_cmd, right_cmd);
   }
 
 
