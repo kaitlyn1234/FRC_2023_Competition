@@ -49,20 +49,20 @@ public class Robot extends TimedRobot {
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
-  PIDController left_drivetrain_vel_pid = new PIDController(0.001, 0.02, 0.0);
-  PIDController right_drivetrain_vel_pid = new PIDController(0.001, 0.02, 0.0);
+  PIDController ang_drivetrain_vel_pid = new PIDController(0.5, 0.00, 0.0);
+  PIDController lin_drivetrain_vel_pid = new PIDController(0.000, 0.002, 0.0);
 
   final double ticks_per_meter = 447.388; // 1/( (1/10.71) * 2 * Math.PI * 0.0762 * (1/20));
   final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
 
   // Control yaw of the robot
-  PIDController drivetrain_yaw_pos_pid = new PIDController(0.15, 0.0, 0.0);
+  PIDController drivetrain_yaw_pos_pid = new PIDController(1.0, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
-  PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.05, 0.0);
+  PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
 
   final double AUTO_LEVEL_MAX_LIN_VEL = 0.1;
-  final double AUTO_LEVEL_MAX_ANG_VEL = 0.5;
+  final double AUTO_LEVEL_MAX_ANG_VEL = 1.25;
   final double AUTO_LEVEL_DEADBAND_ANG = 0.0; // no deadband for now
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
@@ -74,6 +74,10 @@ public class Robot extends TimedRobot {
   Joystick stick = new Joystick(1);
 
   final double VELOCITY_CALCULATION_DT = 0.1;
+  final double ANG_VELOCITY_CALCULATION_DT = 0.02;
+
+  double yaw_vel = 0;
+  double prev_yaw = 0;
 
   double left_drivetrain_prev_pos = 0;
   double right_drivetrain_prev_pos = 0;
@@ -113,7 +117,8 @@ public class Robot extends TimedRobot {
   public void robotInit() {
     m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
     m_chooser.addOption("My Auto", kCustomAuto);
-    left_Motor_Group.setInverted(true);
+    right_Motor_Group.setInverted(true);
+
     CameraServer.startAutomaticCapture();
     left_lift_motor.setInverted(true);
     SmartDashboard.putData("Auto choices", m_chooser);
@@ -123,8 +128,8 @@ public class Robot extends TimedRobot {
     lift_pivot_group_vel_pid.setIntegratorRange(-0.2, 0.2);
     grabber_pivot_vel_pid.setIntegratorRange(-0.2, 0.2);
 
-    left_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
-    right_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
+    ang_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
+    lin_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
     
     drivetrain_leveling_pid.setIntegratorRange(-0.2, 0.2);
 
@@ -137,12 +142,21 @@ public class Robot extends TimedRobot {
       final double right_current_pos = right_motor_front.getSelectedSensorPosition();
 
       left_drivetrain_vel = (left_current_pos - left_drivetrain_prev_pos) / VELOCITY_CALCULATION_DT;
-      right_drivetrain_vel = (right_current_pos - right_drivetrain_prev_pos) / VELOCITY_CALCULATION_DT;
+      right_drivetrain_vel = -(right_current_pos - right_drivetrain_prev_pos) / VELOCITY_CALCULATION_DT;
 
       left_drivetrain_prev_pos = left_current_pos;
       right_drivetrain_prev_pos = right_current_pos;
       
     }, VELOCITY_CALCULATION_DT, 0.005);
+
+
+    addPeriodic(() -> {
+      double current_yaw = Math.toRadians(ahrs.getYaw());
+      double angle_diff = current_yaw - prev_yaw;
+      double wrapped_ang = Math.atan2(Math.sin(angle_diff), Math.cos(angle_diff));
+      yaw_vel = -wrapped_ang / ANG_VELOCITY_CALCULATION_DT;
+      prev_yaw = current_yaw;      
+    }, ANG_VELOCITY_CALCULATION_DT, 0.005);
   }
 
   @Override
@@ -154,9 +168,10 @@ public class Robot extends TimedRobot {
     System.out.println("gat " + grabber_arms.getMotorTemperature());
     System.out.println("lvel" + left_drivetrain_vel);
     System.out.println("rvel" + right_drivetrain_vel);
+    System.out.println("yaw_vel" + yaw_vel);
 
-    System.out.println("joyx" + stick.getX());
-    System.out.println("joyy" + stick.getY());
+    //System.out.println("joyx" + stick.getX());
+    //System.out.println("joyy" + stick.getY());
 
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
@@ -263,7 +278,14 @@ public class Robot extends TimedRobot {
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      controlDrivetrain(-stick.getY(), -stick.getX());
+      //differential_drive.arcadeDrive(-stick.getY(), -stick.getX());
+
+      double joy_val_y = -stick.getY();
+      if (Math.abs(joy_val_y) < 0.1) { joy_val_y = 0.0; }
+      double joy_val_x = -stick.getX();
+      if (Math.abs(joy_val_x) < 0.1) { joy_val_x = 0.0; }
+  
+      controlDrivetrain(joy_val_y, joy_val_x);
     }
     else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
       autoLevel();
@@ -276,7 +298,7 @@ public class Robot extends TimedRobot {
     // Add a deadband to only control if angle is larger than threshold
     if (Math.abs(pitch) > AUTO_LEVEL_DEADBAND_ANG) {
       // We always want zero pitch. Note: this is assuming 90 rotation of roborio
-      linear_velocity_setpoint = drivetrain_leveling_pid.calculate(0.0, pitch);
+      linear_velocity_setpoint = drivetrain_leveling_pid.calculate(pitch, 0.0);
     }
 
     // Clamp linear velocity output
@@ -284,14 +306,18 @@ public class Robot extends TimedRobot {
     if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(0.0, ahrs.getYaw());
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(ahrs.getYaw(), 0.0);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
     if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
 
     // Control the drivetrain with these velocities
-    controlDrivetrain(-linear_velocity_setpoint, angular_velocity_setpoint);
+    //controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
+    double joy_val = -stick.getY();
+    if (Math.abs(joy_val) < 0.1) { joy_val = 0.0; }
+
+    controlDrivetrain(joy_val, angular_velocity_setpoint);
   }
 
   public void controlDrivetrain(double linear_velocity, double angular_velocity) {
@@ -302,20 +328,24 @@ public class Robot extends TimedRobot {
     double linear_ticks_per_sec = linear_velocity * ticks_per_meter;
     double angular_ticks_per_sec = angular_velocity * wheel_base_radius * ticks_per_meter;
 
+    double avg_vel = (left_drivetrain_vel + right_drivetrain_vel) / 2.0;
+
+    // Calculate feedback term to compensate for error
+    // encoders might need to be negated differently 
+    double ang_cmd_fb = ang_drivetrain_vel_pid.calculate(yaw_vel, angular_velocity);
+    double lin_cmd_fb = lin_drivetrain_vel_pid.calculate(avg_vel, linear_ticks_per_sec);
+    
+    System.out.println("apid" + ang_cmd_fb);
+
     double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
     double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
 
     // Calculate a feedforward command based on max freerunning velocity
-    double left_cmd_ff = left_setpoint / 700.0;
-    double right_cmd_ff = right_setpoint / 700.0;
+    double left_cmd_ff = 0.0;//left_setpoint / 2000.0;
+    double right_cmd_ff = 0.0;//right_setpoint / 2000.0;
 
-    // Calculate feedback term to compensate for error
-    // encoders might need to be negated differently 
-    double left_cmd_fb = left_drivetrain_vel_pid.calculate(left_setpoint, left_drivetrain_vel);
-    double right_cmd_fb = right_drivetrain_vel_pid.calculate(right_setpoint, -right_drivetrain_vel);
-    
-    double left_cmd = left_cmd_ff + left_cmd_fb;
-    double right_cmd = right_cmd_ff + right_cmd_fb;
+    double left_cmd = left_cmd_ff - ang_cmd_fb;// + lin_cmd_fb;
+    double right_cmd = right_cmd_ff + ang_cmd_fb;// + lin_cmd_fb;
 
     System.out.println("left_cmd" + left_cmd);
     System.out.println("right_cmd" + right_cmd);
