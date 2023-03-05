@@ -71,7 +71,7 @@ public class Robot extends TimedRobot {
 
   final double grabber_pivot_max_setpoint = .2;
   final double lift_pivot_group_max_setpoint = .1;
-  final double joystick_deadband_constant= .05;
+  final double joystick_deadband_constant= .1;
   final double extension_max_setpoint = .5;
 
   final double grabber_pivot_gear_ratio = 60 * 37.66;
@@ -207,6 +207,7 @@ public class Robot extends TimedRobot {
     } else {
       grabber_pivot.set(grabber_pivot_vel_pid.calculate (grabber_pivot.getEncoder(). getVelocity() / grabber_pivot_gear_ratio, grabber_pivot_setpoint));
     }
+    
 // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
       grabber_arms.set(-0.1);
@@ -215,10 +216,10 @@ public class Robot extends TimedRobot {
       grabber_arms.set(0.2);
     }
     else{
-      grabber_arms.set(0);
+      grabber_arms.set(0.0);
     }
 
-    differential_drive.arcadeDrive(stick.getY(), stick.getX());
+    differential_drive.arcadeDrive(stick.getY(), stick.getZ());
 }
 
   /** This function is called once when the robot is disabled. */
