@@ -2,6 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
+
+// TO DO:
+// Copy PID tunings from arm pivot to grabber pivot to accomodate new motor
+// Change grabber pivot gear ratio
+// add deadband to stop linear movement when charge station angle <5 degrees
+// move charge station auto-level autonomous to autonomous section
+// merge with main & simple timed drive autonomous
+// set up autonomous mode with no action
+
 package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
@@ -18,6 +27,7 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.controller.PIDController;
 import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Timer;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -49,19 +59,23 @@ public class Robot extends TimedRobot {
   PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
-  PIDController ang_drivetrain_vel_pid = new PIDController(0.5, 0.00, 0.0);
-  PIDController lin_drivetrain_vel_pid = new PIDController(0.000, 0.002, 0.0);
+  PIDController ang_drivetrain_vel_pid = new PIDController(0.1, 1, 0.0);
+  PIDController lin_drivetrain_vel_pid = new PIDController(0.00025, 0.0008, 0.0);
 
   final double ticks_per_meter = 447.388; // 1/( (1/10.71) * 2 * Math.PI * 0.0762 * (1/20));
   final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
 
   // Control yaw of the robot
-  PIDController drivetrain_yaw_pos_pid = new PIDController(1.0, 0.0, 0.0);
+  PIDController drivetrain_yaw_pos_pid = new PIDController(0.5, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.1;
+  Timer drive_up_timer = new Timer();
+  final double AUTO_DRIVE_UP_TIME = 7;
+  final double AUTO_DRIVE_UP_VEL = 0.75;
+
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.25;
   final double AUTO_LEVEL_MAX_ANG_VEL = 1.25;
   final double AUTO_LEVEL_DEADBAND_ANG = 0.0; // no deadband for now
 
@@ -103,7 +117,7 @@ public class Robot extends TimedRobot {
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
-  enum DrivetrainMode { AutoLevel, Normal }
+  enum DrivetrainMode { DriveUp, AutoLevel, Normal }
 
   DrivetrainMode drivetrain_mode = DrivetrainMode.Normal;
 
@@ -169,6 +183,7 @@ public class Robot extends TimedRobot {
     System.out.println("lvel" + left_drivetrain_vel);
     System.out.println("rvel" + right_drivetrain_vel);
     System.out.println("yaw_vel" + yaw_vel);
+    System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
 
     //System.out.println("joyx" + stick.getX());
     //System.out.println("joyy" + stick.getY());
@@ -271,23 +286,31 @@ public class Robot extends TimedRobot {
     }
 
     if (logitechController.getRawButton (7)) {
-      drivetrain_mode = DrivetrainMode.AutoLevel;
+      drive_up_timer.reset();
+      drive_up_timer.start();
+      drivetrain_mode = DrivetrainMode.DriveUp;
+      prev_yaw = 0.0;
+      yaw_vel = 0.0;
       ahrs.zeroYaw();
     } else if (logitechController.getRawButton(8)) {
       drivetrain_mode = DrivetrainMode.Normal;
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      //differential_drive.arcadeDrive(-stick.getY(), -stick.getX());
-
-      double joy_val_y = -stick.getY();
-      if (Math.abs(joy_val_y) < 0.1) { joy_val_y = 0.0; }
-      double joy_val_x = -stick.getX();
-      if (Math.abs(joy_val_x) < 0.1) { joy_val_x = 0.0; }
-  
-      controlDrivetrain(joy_val_y, joy_val_x);
+      differential_drive.arcadeDrive(-stick.getY(), -stick.getX());
+    }
+    else if (drivetrain_mode == DrivetrainMode.DriveUp) {
+      System.out.println("EXECUTING DRIVEUP");
+      if (drive_up_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
+        drivetrain_mode = DrivetrainMode.AutoLevel;
+        drive_up_timer.reset();
+        straightDrive(0);
+      } else {
+        straightDrive(AUTO_DRIVE_UP_VEL);
+      }
     }
     else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
+      System.out.println("EXECUTING AUTOLEVEL");
       autoLevel();
     }
   }
@@ -306,18 +329,26 @@ public class Robot extends TimedRobot {
     if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(ahrs.getYaw(), 0.0);
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), 0.0);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
     if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
 
     // Control the drivetrain with these velocities
-    //controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
-    double joy_val = -stick.getY();
-    if (Math.abs(joy_val) < 0.1) { joy_val = 0.0; }
+    controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
+  }
 
-    controlDrivetrain(joy_val, angular_velocity_setpoint);
+  public void straightDrive(double lin_vel) {
+    // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), 0.0);
+
+    // Clamp angular velocity output
+    if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
+    if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
+
+    // Control the drivetrain with these velocities
+    controlDrivetrain(lin_vel, angular_velocity_setpoint);
   }
 
   public void controlDrivetrain(double linear_velocity, double angular_velocity) {
@@ -335,17 +366,15 @@ public class Robot extends TimedRobot {
     double ang_cmd_fb = ang_drivetrain_vel_pid.calculate(yaw_vel, angular_velocity);
     double lin_cmd_fb = lin_drivetrain_vel_pid.calculate(avg_vel, linear_ticks_per_sec);
     
-    System.out.println("apid" + ang_cmd_fb);
-
     double left_setpoint = linear_ticks_per_sec - angular_ticks_per_sec;
     double right_setpoint = linear_ticks_per_sec + angular_ticks_per_sec;
 
     // Calculate a feedforward command based on max freerunning velocity
-    double left_cmd_ff = 0.0;//left_setpoint / 2000.0;
-    double right_cmd_ff = 0.0;//right_setpoint / 2000.0;
+    double left_cmd_ff = left_setpoint / 7000.0;
+    double right_cmd_ff = right_setpoint / 7000.0;
 
-    double left_cmd = left_cmd_ff - ang_cmd_fb;// + lin_cmd_fb;
-    double right_cmd = right_cmd_ff + ang_cmd_fb;// + lin_cmd_fb;
+    double left_cmd = left_cmd_ff - ang_cmd_fb + lin_cmd_fb;
+    double right_cmd = right_cmd_ff + ang_cmd_fb + lin_cmd_fb;
 
     System.out.println("left_cmd" + left_cmd);
     System.out.println("right_cmd" + right_cmd);
