@@ -4,8 +4,8 @@
 
 
 // TO DO:
-// Copy PID tunings from arm pivot to grabber pivot to accomodate new motor
-// Change grabber pivot gear ratio
+// Copy PID tunings from arm pivot to grabber pivot to accomodate new motor 
+// Change grabber pivot gear ratio-----
 // add deadband to stop linear movement when charge station angle <5 degrees
 // move charge station auto-level autonomous to autonomous section
 // merge with main & simple timed drive autonomous
@@ -56,14 +56,15 @@ public class Robot extends TimedRobot {
 
   PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
-  PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
+  PIDController grabber_pivot_vel_pid = new PIDController(1.1, 1.5, 0.0);
+ // original    PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
   PIDController ang_drivetrain_vel_pid = new PIDController(0.1, 1, 0.0);
   PIDController lin_drivetrain_vel_pid = new PIDController(0.00025, 0.0008, 0.0);
 
   final double ticks_per_meter = 447.388; // 1/( (1/10.71) * 2 * Math.PI * 0.0762 * (1/20));
-  final double wheel_base_width = 0.562; // We need to measure the distance between the left and right wheels
+  final double wheel_base_width = 0.562; // Distance between the left and right wheels
 
   // Control yaw of the robot
   PIDController drivetrain_yaw_pos_pid = new PIDController(0.5, 0.0, 0.0);
@@ -113,7 +114,7 @@ public class Robot extends TimedRobot {
   final double joystick_deadband_constant= .05;
   final double extension_max_setpoint = .5;
 
-  final double grabber_pivot_gear_ratio = 60 * 37.66;
+  final double grabber_pivot_gear_ratio = 60 * 48;
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
