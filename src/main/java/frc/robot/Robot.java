@@ -48,7 +48,7 @@ public class Robot extends TimedRobot {
 
   PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
-  PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
+  PIDController grabber_pivot_vel_pid = new PIDController(1.0, 0.5, 0.0);
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -74,7 +74,7 @@ public class Robot extends TimedRobot {
   final double joystick_deadband_constant= .1;
   final double extension_max_setpoint = .5;
 
-  final double grabber_pivot_gear_ratio = 60 * 37.66;
+  final double grabber_pivot_gear_ratio = 60 * 48;
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
@@ -113,10 +113,10 @@ public class Robot extends TimedRobot {
     System.out.println("et " + extension.getMotorTemperature());
     System.out.println("GPt " + grabber_pivot.getMotorTemperature());
     System.out.println("gat " + grabber_arms.getMotorTemperature());
-    // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
-    // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
+    System.out.println("rpc " + right_lift_motor.getOutputCurrent());
+    System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
-    // System.out.println("exc " + extension.getOutputCurrent());
+    System.out.println("exc " + extension.getOutputCurrent());
     //System.out.println(ahrs.getRoll());
   }
 
@@ -196,7 +196,7 @@ public class Robot extends TimedRobot {
     }
 
 // GRABBER PIVOT
-    double grabber_pivot_setpoint = -logitechController.getRawAxis(1);
+    double grabber_pivot_setpoint = logitechController.getRawAxis(1);
     if (Math.abs(grabber_pivot_setpoint) < joystick_deadband_constant) {
       grabber_pivot_setpoint = 0;
     }
