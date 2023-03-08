@@ -58,7 +58,6 @@ public class Robot extends TimedRobot {
   PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
   PIDController grabber_pivot_vel_pid = new PIDController(1.1, 1.5, 0.0);
- // original    PIDController grabber_pivot_vel_pid = new PIDController(0.5, 0.5, 0.0);
 
   // Control velocity of drivetrain wheels
   PIDController ang_drivetrain_vel_pid = new PIDController(0.1, 1, 0.0);
@@ -217,51 +216,41 @@ public class Robot extends TimedRobot {
     m_autoSelected = m_chooser.getSelected();
     // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
+    autonomous_timer.reset();
+    autonomous_timer.start();
   }
 
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
-  
     switch (m_autoSelected) {
-    case kCustomAuto: ;
+    case kCustomAuto:
       //leave community
-      differential_drive.feedWatchdog();
-  
       if (autonomous_timer.hasElapsed(4.0)) {
-        left_Motor_Group.set(0.0);
-        right_Motor_Group.set(0.0);
+        differential_drive.tankDrive(0.0, 0.0);
       }
       else {
-        left_Motor_Group.set(0.3);
-        right_Motor_Group.set(0.3);
-      
-
-
-        break;
+        differential_drive.tankDrive(0.3, 0.3);
       }
-      switch (m_autoSelected) {
-      case kCustomAuto2: ;
-        //robot stays still
-        if (autonomous_timer.hasElapsed(0.5)) {
-          left_Motor_Group.set(0.0);
-          right_Motor_Group.set(0.0);
-        }
+      break;
 
-        
-      case kDefaultAuto:
-      default:
+    case kCustomAuto2:
+      //robot stays still
+      differential_drive.tankDrive(0.0, 0.0);
+      break;
+
+    case kDefaultAuto:
+    default:
       //charging station
-      if (autonomous_timer.hasElapsed(0.5)){
+      if (drivetrain_mode == DrivetrainMode.Normal) {
         drive_up_timer.reset();
         drive_up_timer.start();
         drivetrain_mode = DrivetrainMode.DriveUp;
         prev_yaw = 0.0;
         yaw_vel = 0.0;
         ahrs.zeroYaw();
-  
       }
-      else if (autonomous_timer.hasElapsed(7.5))  {
+      else if (drivetrain_mode == DrivetrainMode.DriveUp) {
         System.out.println("EXECUTING DRIVEUP");
         if (drive_up_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
           drivetrain_mode = DrivetrainMode.AutoLevel;
@@ -275,14 +264,15 @@ public class Robot extends TimedRobot {
         System.out.println("EXECUTING AUTOLEVEL");
         autoLevel();
       }
-        break;
-    }
+      break;
     }
   }
 
   /** This function is called once when teleop is enabled. */
   @Override
-  public void teleopInit() {}
+  public void teleopInit() {
+    drivetrain_mode = DrivetrainMode.Normal;
+  }
 
   /** This function is called periodically during operator control. */
   @Override
