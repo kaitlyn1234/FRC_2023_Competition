@@ -4,8 +4,8 @@
 
 
 // TO DO:
-// Copy PID tunings from arm pivot to grabber pivot to accomodate new motor 
-// Change grabber pivot gear ratio-----
+// Copy PID tunings from arm pivot to grabber pivot to accomodate new motor
+// Change grabber pivot gear ratio
 // add deadband to stop linear movement when charge station angle <5 degrees
 // move charge station auto-level autonomous to autonomous section
 // merge with main & simple timed drive autonomous
@@ -36,8 +36,9 @@ import edu.wpi.first.wpilibj.Timer;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
+  private static final String kDefaultAuto = "Charging Station";
+  private static final String kCustomAuto = "Leave Community";
+  private static final String kCustomAuto2 = "Nothing";
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
@@ -73,12 +74,13 @@ public class Robot extends TimedRobot {
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
 
   Timer drive_up_timer = new Timer();
+  Timer autonomous_timer = new Timer();
   final double AUTO_DRIVE_UP_TIME = 7;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
   final double AUTO_LEVEL_MAX_LIN_VEL = 0.25;
   final double AUTO_LEVEL_MAX_ANG_VEL = 1.25;
-  final double AUTO_LEVEL_DEADBAND_ANG = 0.0; // no deadband for now
+  final double AUTO_LEVEL_DEADBAND_ANG = 6.5; // no deadband for now
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -130,8 +132,12 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
+    m_chooser.setDefaultOption("Charging Station", kDefaultAuto);
+    m_chooser.addOption("Leave Community", kCustomAuto);
+    m_chooser.addOption("Nothing", kCustomAuto2);
+    SmartDashboard.putData("Auto choices", m_chooser);
+
+
     right_Motor_Group.setInverted(true);
 
     CameraServer.startAutomaticCapture();
@@ -216,14 +222,61 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
+  
     switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
+    case kCustomAuto: ;
+      //leave community
+      differential_drive.feedWatchdog();
+  
+      if (autonomous_timer.hasElapsed(4.0)) {
+        left_Motor_Group.set(0.0);
+        right_Motor_Group.set(0.0);
+      }
+      else {
+        left_Motor_Group.set(0.3);
+        right_Motor_Group.set(0.3);
+      
+
+
         break;
+      }
+      switch (m_autoSelected) {
+      case kCustomAuto2: ;
+        //robot stays still
+        if (autonomous_timer.hasElapsed(0.5)) {
+          left_Motor_Group.set(0.0);
+          right_Motor_Group.set(0.0);
+        }
+
+        
       case kDefaultAuto:
       default:
-        // Put default auto code here
+      //charging station
+      if (autonomous_timer.hasElapsed(0.5)){
+        drive_up_timer.reset();
+        drive_up_timer.start();
+        drivetrain_mode = DrivetrainMode.DriveUp;
+        prev_yaw = 0.0;
+        yaw_vel = 0.0;
+        ahrs.zeroYaw();
+  
+      }
+      else if (autonomous_timer.hasElapsed(7.5))  {
+        System.out.println("EXECUTING DRIVEUP");
+        if (drive_up_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
+          drivetrain_mode = DrivetrainMode.AutoLevel;
+          drive_up_timer.reset();
+          straightDrive(0);
+        } else {
+          straightDrive(AUTO_DRIVE_UP_VEL);
+        }
+      }
+      else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
+        System.out.println("EXECUTING AUTOLEVEL");
+        autoLevel();
+      }
         break;
+    }
     }
   }
 
@@ -285,7 +338,7 @@ public class Robot extends TimedRobot {
     else{
       grabber_arms.set(0);
     }
-
+    //AUTO LEVEL
     if (logitechController.getRawButton (7)) {
       drive_up_timer.reset();
       drive_up_timer.start();
@@ -298,7 +351,7 @@ public class Robot extends TimedRobot {
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      differential_drive.arcadeDrive(-stick.getY(), -stick.getX());
+      differential_drive.arcadeDrive(-stick.getY(), -stick.getZ());
     }
     else if (drivetrain_mode == DrivetrainMode.DriveUp) {
       System.out.println("EXECUTING DRIVEUP");
