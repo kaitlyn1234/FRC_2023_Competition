@@ -67,7 +67,7 @@ public class Robot extends TimedRobot {
   final double wheel_base_width = 0.562; // Distance between the left and right wheels
 
   // Control yaw of the robot
-  PIDController drivetrain_yaw_pos_pid = new PIDController(0.5, 0.0, 0.0);
+  PIDController drivetrain_yaw_pos_pid = new PIDController(2.5, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
@@ -193,10 +193,10 @@ public class Robot extends TimedRobot {
    // System.out.println("rpt " + right_lift_motor.getMotorTemperature());
    // System.out.println("lpt " + left_lift_motor.getMotorTemperature());
    // System.out.println("et " + extension.getMotorTemperature());
-    System.out.println("GPt " + grabber_pivot.getMotorTemperature());
-    System.out.println("gat " + grabber_arms.getMotorTemperature());
-    System.out.println("lvel" + left_drivetrain_vel);
-    System.out.println("rvel" + right_drivetrain_vel);
+    //System.out.println("GPt " + grabber_pivot.getMotorTemperature());
+   // System.out.println("gat " + grabber_arms.getMotorTemperature());
+    //System.out.println("lvel" + left_drivetrain_vel);
+    //System.out.println("rvel" + right_drivetrain_vel);
     System.out.println("yaw_vel" + yaw_vel);
     System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
     System.out.println("yaw_setpoint" + yaw_setpoint);
