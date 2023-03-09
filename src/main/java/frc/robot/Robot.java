@@ -67,19 +67,19 @@ public class Robot extends TimedRobot {
   final double wheel_base_width = 0.562; // Distance between the left and right wheels
 
   // Control yaw of the robot
-  PIDController drivetrain_yaw_pos_pid = new PIDController(2.5, 0.0, 0.0);
+  PIDController drivetrain_yaw_pos_pid = new PIDController(2.0, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
 
   Timer drive_up_timer = new Timer();
   Timer autonomous_timer = new Timer();
-  final double AUTO_DRIVE_UP_TIME = 7;
+  final double AUTO_DRIVE_UP_TIME = 4;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.25;
-  final double AUTO_LEVEL_MAX_ANG_VEL = 1.25;
-  final double AUTO_LEVEL_DEADBAND_ANG = 6.5; // no deadband for now
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.5;
+  final double AUTO_LEVEL_MAX_ANG_VEL = 2;
+  final double AUTO_LEVEL_DEADBAND_ANG = 8.0; 
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -199,10 +199,10 @@ public class Robot extends TimedRobot {
    // System.out.println("gat " + grabber_arms.getMotorTemperature());
     //System.out.println("lvel" + left_drivetrain_vel);
     //System.out.println("rvel" + right_drivetrain_vel);
-    System.out.println("yaw_vel" + yaw_vel);
-    System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
-    System.out.println("yaw_setpoint" + yaw_setpoint);
-    System.out.println("yaw_err" + wrapAngle(yaw_setpoint-Math.toRadians(ahrs.getYaw())));
+    //System.out.println("yaw_vel" + yaw_vel);
+   // System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
+   // System.out.println("yaw_setpoint" + yaw_setpoint);
+    //System.out.println("yaw_err" + wrapAngle(yaw_setpoint-Math.toRadians(ahrs.getYaw())));
 
     //System.out.println("joyx" + stick.getX());
     //System.out.println("joyy" + stick.getY());
@@ -245,7 +245,7 @@ public class Robot extends TimedRobot {
         differential_drive.tankDrive(0.0, 0.0);
       }
       else {
-        differential_drive.tankDrive(0.5, 0.5);
+        differential_drive.tankDrive(0.4, 0.4);
       }
       break;
 
@@ -266,12 +266,13 @@ public class Robot extends TimedRobot {
       }
       else if (drivetrain_mode == DrivetrainMode.DriveUp) {
         System.out.println("EXECUTING DRIVEUP");
-        if (drive_up_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
+        if (autonomous_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
           drivetrain_mode = DrivetrainMode.AutoLevel;
           drive_up_timer.reset();
-          straightDrive(0);
-        } else {
-          straightDrive(AUTO_DRIVE_UP_VEL);
+          differential_drive.tankDrive(0.0, 0.0);
+        }
+        else {
+          differential_drive.tankDrive(0.5, 0.5);
         }
       }
       else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
@@ -357,42 +358,17 @@ public class Robot extends TimedRobot {
     else{
       grabber_arms.set(0);
     }
-    //AUTO LEVEL
-    if (logitechController.getRawButton (7)) {
-      drive_up_timer.reset();
-      drive_up_timer.start();
-      drivetrain_mode = DrivetrainMode.DriveUp;
-      yaw_setpoint = Math.toRadians(ahrs.getYaw());
-    } else if (logitechController.getRawButton(8)) {
-      drivetrain_mode = DrivetrainMode.Normal;
-    }
 
-    if (drivetrain_mode == DrivetrainMode.Normal) {
-      double turn_raw = -stick.getZ();
-      double drive_raw = -stick.getY();
+    double turn_raw = -stick.getZ();
+    double drive_raw = -stick.getY();
 
-      double drive_cmd_scaled = evaluatePolynomialDrive(java.lang.Math.abs(drive_raw));
-      double turn_cmd_scaled = evaluatePolynomialTurn(java.lang.Math.abs(turn_raw));
-  
-      drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
-      turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
-      
-      differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
-    }
-    else if (drivetrain_mode == DrivetrainMode.DriveUp) {
-      System.out.println("EXECUTING DRIVEUP");
-      if (drive_up_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
-        drivetrain_mode = DrivetrainMode.AutoLevel;
-        drive_up_timer.reset();
-        straightDrive(0);
-      } else {
-        straightDrive(AUTO_DRIVE_UP_VEL);
-      }
-    }
-    else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
-      System.out.println("EXECUTING AUTOLEVEL");
-      autoLevel();
-    }
+    double drive_cmd_scaled = evaluatePolynomialDrive(java.lang.Math.abs(drive_raw));
+    double turn_cmd_scaled = evaluatePolynomialTurn(java.lang.Math.abs(turn_raw));
+
+    drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
+    turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
+    
+    differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
   }
 
   public void autoLevel() {
@@ -402,6 +378,9 @@ public class Robot extends TimedRobot {
     if (Math.abs(pitch) > AUTO_LEVEL_DEADBAND_ANG) {
       // We always want zero pitch. Note: this is assuming 90 rotation of roborio
       linear_velocity_setpoint = drivetrain_leveling_pid.calculate(pitch, 0.0);
+    } else {
+      ang_drivetrain_vel_pid.reset();
+      lin_drivetrain_vel_pid.reset();
     }
 
     // Clamp linear velocity output
