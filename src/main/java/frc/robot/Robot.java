@@ -176,12 +176,16 @@ public class Robot extends TimedRobot {
     addPeriodic(() -> {
       double current_yaw = Math.toRadians(ahrs.getYaw());
       double angle_diff = current_yaw - prev_yaw;
-      double wrapped_ang = Math.atan2(Math.sin(angle_diff), Math.cos(angle_diff));
+      double wrapped_ang = wrapAngle(angle_diff);
       yaw_vel = -wrapped_ang / ANG_VELOCITY_CALCULATION_DT;
       prev_yaw = current_yaw;      
     }, ANG_VELOCITY_CALCULATION_DT, 0.005);
 
     drivetrain_mode = DrivetrainMode.Normal;
+  }
+
+  double wrapAngle(double ang) {
+    return Math.atan2(Math.sin(ang), Math.cos(ang));
   }
 
   @Override
@@ -397,7 +401,7 @@ public class Robot extends TimedRobot {
     if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
+    double angular_velocity_setpoint = 0.5 * wrapAngle(yaw_setpoint - Math.toRadians(-ahrs.getYaw()));//drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
@@ -409,7 +413,7 @@ public class Robot extends TimedRobot {
 
   public void straightDrive(double lin_vel) {
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
+    double angular_velocity_setpoint = 0.5 * wrapAngle(yaw_setpoint - Math.toRadians(-ahrs.getYaw()));//drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
