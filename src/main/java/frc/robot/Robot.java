@@ -182,6 +182,8 @@ public class Robot extends TimedRobot {
     }, ANG_VELOCITY_CALCULATION_DT, 0.005);
 
     drivetrain_mode = DrivetrainMode.Normal;
+    ang_drivetrain_vel_pid.reset();
+    lin_drivetrain_vel_pid.reset();
   }
 
   double wrapAngle(double ang) {
@@ -229,6 +231,9 @@ public class Robot extends TimedRobot {
     autonomous_timer.reset();
     autonomous_timer.start();
     drivetrain_mode = DrivetrainMode.Normal;
+
+    ang_drivetrain_vel_pid.reset();
+    lin_drivetrain_vel_pid.reset();
   }
 
   @Override
@@ -255,7 +260,7 @@ public class Robot extends TimedRobot {
       if (drivetrain_mode == DrivetrainMode.Normal) {
         drive_up_timer.reset();
         drive_up_timer.start();
-        
+
         drivetrain_mode = DrivetrainMode.DriveUp;
         yaw_setpoint = Math.toRadians(ahrs.getYaw());
       }
