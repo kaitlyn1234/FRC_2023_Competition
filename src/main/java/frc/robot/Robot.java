@@ -42,13 +42,13 @@ public class Robot extends TimedRobot {
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
-// DRIVE TRAIN MOTORS
+  // DRIVE TRAIN MOTORS
   WPI_TalonSRX left_motor_front = new WPI_TalonSRX(4);
   WPI_TalonSRX right_motor_front = new WPI_TalonSRX(3);
   WPI_VictorSPX right_motor_back = new WPI_VictorSPX(1);
   WPI_VictorSPX left_motor_back = new WPI_VictorSPX(2);
 
-// EXTENSION, PIVOT, ETC. MOTORS
+  // EXTENSION, PIVOT, ETC. MOTORS
   CANSparkMax right_lift_motor = new CANSparkMax(5, MotorType.kBrushless);;
   CANSparkMax left_lift_motor = new CANSparkMax(6, MotorType.kBrushless);;
   CANSparkMax extension = new CANSparkMax(7, MotorType.kBrushless);;
@@ -149,7 +149,7 @@ public class Robot extends TimedRobot {
     grabber_pivot_vel_pid.setIntegratorRange(-0.2, 0.2);
 
     ang_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
-    lin_drivetrain_vel_pid.setIntegratorRange(-0.5, 0.5);
+    lin_drivetrain_vel_pid.setIntegratorRange(-0.7, 0.7);
     
     drivetrain_leveling_pid.setIntegratorRange(-0.2, 0.2);
 
@@ -219,7 +219,6 @@ public class Robot extends TimedRobot {
     autonomous_timer.start();
   }
 
-  /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
     switch (m_autoSelected) {
