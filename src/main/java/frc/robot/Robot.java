@@ -214,7 +214,6 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
     m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
     autonomous_timer.reset();
     autonomous_timer.start();
@@ -226,11 +225,11 @@ public class Robot extends TimedRobot {
     switch (m_autoSelected) {
     case kCustomAuto:
       //leave community
-      if (autonomous_timer.hasElapsed(4.0)) {
+      if (autonomous_timer.hasElapsed(3.0)) {
         differential_drive.tankDrive(0.0, 0.0);
       }
       else {
-        differential_drive.tankDrive(0.3, 0.3);
+        differential_drive.tankDrive(0.5, 0.5);
       }
       break;
 
