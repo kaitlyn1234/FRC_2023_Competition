@@ -274,9 +274,8 @@ public class Robot extends TimedRobot {
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() 
+  public void teleopPeriodic()
   {
-
     //  LIFT PIVOT
     double lift_pivot_group_setpoint = logitechController.getRawAxis(5);
     if (Math.abs(lift_pivot_group_setpoint) < joystick_deadband_constant) {
@@ -381,7 +380,7 @@ public class Robot extends TimedRobot {
 
   public void straightDrive(double lin_vel) {
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), 0.0);
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
