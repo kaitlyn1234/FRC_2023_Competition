@@ -253,8 +253,9 @@ public class Robot extends TimedRobot {
       if (drivetrain_mode == DrivetrainMode.Normal) {
         drive_up_timer.reset();
         drive_up_timer.start();
+        
         drivetrain_mode = DrivetrainMode.DriveUp;
-        yaw_setpoint = ahrs.getYaw();
+        yaw_setpoint = Math.toRadians(ahrs.getYaw());
       }
       else if (drivetrain_mode == DrivetrainMode.DriveUp) {
         System.out.println("EXECUTING DRIVEUP");
@@ -354,7 +355,7 @@ public class Robot extends TimedRobot {
       drive_up_timer.reset();
       drive_up_timer.start();
       drivetrain_mode = DrivetrainMode.DriveUp;
-      yaw_setpoint = ahrs.getYaw();
+      yaw_setpoint = Math.toRadians(ahrs.getYaw());
     } else if (logitechController.getRawButton(8)) {
       drivetrain_mode = DrivetrainMode.Normal;
     }
@@ -401,7 +402,7 @@ public class Robot extends TimedRobot {
     if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = 0.5 * wrapAngle(yaw_setpoint - Math.toRadians(-ahrs.getYaw()));//drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
@@ -413,7 +414,7 @@ public class Robot extends TimedRobot {
 
   public void straightDrive(double lin_vel) {
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = 0.5 * wrapAngle(yaw_setpoint - Math.toRadians(-ahrs.getYaw()));//drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
