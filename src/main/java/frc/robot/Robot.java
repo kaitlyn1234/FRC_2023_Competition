@@ -199,6 +199,8 @@ public class Robot extends TimedRobot {
     System.out.println("rvel" + right_drivetrain_vel);
     System.out.println("yaw_vel" + yaw_vel);
     System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
+    System.out.println("yaw_setpoint" + yaw_setpoint);
+    System.out.println("yaw_err" + wrapAngle(yaw_setpoint-Math.toRadians(ahrs.getYaw())));
 
     //System.out.println("joyx" + stick.getX());
     //System.out.println("joyy" + stick.getY());
