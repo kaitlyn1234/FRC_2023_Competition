@@ -179,6 +179,8 @@ public class Robot extends TimedRobot {
       yaw_vel = -wrapped_ang / ANG_VELOCITY_CALCULATION_DT;
       prev_yaw = current_yaw;      
     }, ANG_VELOCITY_CALCULATION_DT, 0.005);
+
+    drivetrain_mode = DrivetrainMode.Normal;
   }
 
   @Override
@@ -219,6 +221,7 @@ public class Robot extends TimedRobot {
     System.out.println("Auto selected: " + m_autoSelected);
     autonomous_timer.reset();
     autonomous_timer.start();
+    drivetrain_mode = DrivetrainMode.Normal;
   }
 
   @Override
@@ -271,12 +274,27 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     drivetrain_mode = DrivetrainMode.Normal;
   }
+  
+  public double evaluatePolynomialDrive(double x) {
+      double a = 0.0;
+      double b = 1;
+      double c = 0.0;
+
+      return a*x + b*java.lang.Math.pow(x, 2) + c*java.lang.Math.pow(x, 3);
+  }
+
+  public double evaluatePolynomialTurn(double x) {
+    double a = 0.0;
+    double b = 0.5;
+    double c = 0.5;
+
+    return a*x + b*java.lang.Math.pow(x, 2) + c*java.lang.Math.pow(x, 3);
+  }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() 
   {
-
     //  LIFT PIVOT
     double lift_pivot_group_setpoint = logitechController.getRawAxis(5);
     if (Math.abs(lift_pivot_group_setpoint) < joystick_deadband_constant) {
@@ -337,7 +355,16 @@ public class Robot extends TimedRobot {
     }
 
     if (drivetrain_mode == DrivetrainMode.Normal) {
-      differential_drive.arcadeDrive(-stick.getY(), -stick.getZ());
+      double turn_raw = -stick.getZ();
+      double drive_raw = -stick.getY();
+
+      double drive_cmd_scaled = evaluatePolynomialDrive(java.lang.Math.abs(drive_raw));
+      double turn_cmd_scaled = evaluatePolynomialTurn(java.lang.Math.abs(turn_raw));
+  
+      drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
+      turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
+      
+      differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
     }
     else if (drivetrain_mode == DrivetrainMode.DriveUp) {
       System.out.println("EXECUTING DRIVEUP");
