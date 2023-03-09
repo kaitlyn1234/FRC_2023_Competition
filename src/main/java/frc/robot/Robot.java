@@ -101,6 +101,8 @@ public class Robot extends TimedRobot {
   double left_drivetrain_vel = 0;
   double right_drivetrain_vel = 0;
 
+  double yaw_setpoint = 0;
+
   final int LIFT_BUTTON_DOWN = 1;
   final int LIFT_BUTTON_UP = 2;
   final int EXTENSION_BUTTON_IN = 3;
@@ -244,9 +246,7 @@ public class Robot extends TimedRobot {
         drive_up_timer.reset();
         drive_up_timer.start();
         drivetrain_mode = DrivetrainMode.DriveUp;
-        prev_yaw = 0.0;
-        yaw_vel = 0.0;
-        ahrs.zeroYaw();
+        yaw_setpoint = ahrs.getYaw();
       }
       else if (drivetrain_mode == DrivetrainMode.DriveUp) {
         System.out.println("EXECUTING DRIVEUP");
@@ -331,9 +331,7 @@ public class Robot extends TimedRobot {
       drive_up_timer.reset();
       drive_up_timer.start();
       drivetrain_mode = DrivetrainMode.DriveUp;
-      prev_yaw = 0.0;
-      yaw_vel = 0.0;
-      ahrs.zeroYaw();
+      yaw_setpoint = ahrs.getYaw();
     } else if (logitechController.getRawButton(8)) {
       drivetrain_mode = DrivetrainMode.Normal;
     }
@@ -371,7 +369,7 @@ public class Robot extends TimedRobot {
     if (linear_velocity_setpoint < -AUTO_LEVEL_MAX_LIN_VEL) { linear_velocity_setpoint = -AUTO_LEVEL_MAX_LIN_VEL; }
 
     // We zero the yaw angle when starting level control mode, so try to reach zero degrees yaw
-    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), 0.0);
+    double angular_velocity_setpoint = drivetrain_yaw_pos_pid.calculate(Math.toRadians(-ahrs.getYaw()), yaw_setpoint);
 
     // Clamp angular velocity output
     if (angular_velocity_setpoint > AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = AUTO_LEVEL_MAX_ANG_VEL; }
