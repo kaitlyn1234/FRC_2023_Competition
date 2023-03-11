@@ -74,12 +74,12 @@ public class Robot extends TimedRobot {
 
   Timer drive_up_timer = new Timer();
   Timer autonomous_timer = new Timer();
-  final double AUTO_DRIVE_UP_TIME = 4;
+  final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.5;
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.35;
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
-  final double AUTO_LEVEL_DEADBAND_ANG = 8.0; 
+  final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -241,7 +241,7 @@ public class Robot extends TimedRobot {
     switch (m_autoSelected) {
     case kCustomAuto:
       //leave community
-      if (autonomous_timer.hasElapsed(3.0)) {
+      if (autonomous_timer.hasElapsed(3.5)) {
         differential_drive.tankDrive(0.0, 0.0);
       }
       else {
@@ -272,7 +272,7 @@ public class Robot extends TimedRobot {
           differential_drive.tankDrive(0.0, 0.0);
         }
         else {
-          differential_drive.tankDrive(0.5, 0.5);
+          differential_drive.tankDrive(0.75, 0.75);
         }
       }
       else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
@@ -337,7 +337,7 @@ public class Robot extends TimedRobot {
     }
 
     // GRABBER PIVOT
-    double grabber_pivot_setpoint = -logitechController.getRawAxis(1);
+    double grabber_pivot_setpoint = logitechController.getRawAxis(1);
     if (Math.abs(grabber_pivot_setpoint) < joystick_deadband_constant) {
       grabber_pivot_setpoint = 0;
     }
