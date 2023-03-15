@@ -77,9 +77,12 @@ public class Robot extends TimedRobot {
   final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.35;
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.5;
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
   final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
+
+  final double MAX_PITCH_FF = 0.5;
+  final double DEADBAND_FF = 0.2;
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
@@ -424,7 +427,6 @@ public class Robot extends TimedRobot {
     double pitch = Math.toRadians(ahrs.getRoll());
     double pitch_ff = -Math.sin(pitch) * 1.5;
 
-    double MAX_PITCH_FF = 0.5;
     if (pitch_ff > MAX_PITCH_FF) { pitch_ff = MAX_PITCH_FF; }
     if (pitch_ff < -MAX_PITCH_FF) { pitch_ff = -MAX_PITCH_FF; }
 
@@ -449,11 +451,11 @@ public class Robot extends TimedRobot {
     double left_cmd_ff = left_setpoint / 7000.0;
     double right_cmd_ff = right_setpoint / 7000.0;
 
-    double left_cmd = left_cmd_ff - ang_cmd_fb + lin_cmd_fb + pitch_ff;
-    double right_cmd = right_cmd_ff + ang_cmd_fb + lin_cmd_fb + pitch_ff;
+    double left_cmd = left_cmd_ff - ang_cmd_fb + lin_cmd_fb + pitch_ff + DEADBAND_FF * Math.signum(left_setpoint);
+    double right_cmd = right_cmd_ff + ang_cmd_fb + lin_cmd_fb + pitch_ff + DEADBAND_FF * Math.signum(right_setpoint);
 
-//    System.out.println("left_cmd" + left_cmd);
-//    System.out.println("right_cmd" + right_cmd);
+    SmartDashboard.putNumber("left_cmd", left_cmd);
+    SmartDashboard.putNumber("right_cmd", right_cmd);
 
     differential_drive.tankDrive(left_cmd, right_cmd);
   }
