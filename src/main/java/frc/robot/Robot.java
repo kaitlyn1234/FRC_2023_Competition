@@ -112,6 +112,8 @@ public class Robot extends TimedRobot {
   final int GRABBER_PIVOT_BUTTON_DOWN = 7;
   final int GRABBER_PIVOT_BUTTON_UP = 8;
 
+  int print_idx = 0;
+
   final double grabber_pivot_max_setpoint = .2;
   final double lift_pivot_group_max_setpoint = .1;
   final double joystick_deadband_constant= .05;
@@ -200,7 +202,7 @@ public class Robot extends TimedRobot {
     //System.out.println("lvel" + left_drivetrain_vel);
     //System.out.println("rvel" + right_drivetrain_vel);
     //System.out.println("yaw_vel" + yaw_vel);
-   // System.out.println("yaw" + Math.toRadians(ahrs.getYaw()));
+  // System.out.println("roll" + Math.toRadians(ahrs.getRoll()));
    // System.out.println("yaw_setpoint" + yaw_setpoint);
     //System.out.println("yaw_err" + wrapAngle(yaw_setpoint-Math.toRadians(ahrs.getYaw())));
 
@@ -210,8 +212,12 @@ public class Robot extends TimedRobot {
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
-    // System.out.println("exc " + extension.getOutputCurrent());
+    if (print_idx % 25 == 0) {
+      System.out.println("exc " + extension.getOutputCurrent());
+    }
     //System.out.println(ahrs.getRoll());
+
+    print_idx = print_idx + 1;
   }
 
   /**
@@ -234,10 +240,14 @@ public class Robot extends TimedRobot {
 
     ang_drivetrain_vel_pid.reset();
     lin_drivetrain_vel_pid.reset();
+
+    grabber_arms.set(-0.1);
   }
 
   @Override
   public void autonomousPeriodic() {
+    grabber_arms.set(-0.1);
+
     switch (m_autoSelected) {
     case kCustomAuto:
       //leave community
@@ -272,7 +282,7 @@ public class Robot extends TimedRobot {
           differential_drive.tankDrive(0.0, 0.0);
         }
         else {
-          differential_drive.tankDrive(0.75, 0.75);
+          differential_drive.tankDrive(0.77, 0.77);
         }
       }
       else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
@@ -411,6 +421,13 @@ public class Robot extends TimedRobot {
   }
 
   public void controlDrivetrain(double linear_velocity, double angular_velocity) {
+    double pitch = Math.toRadians(ahrs.getRoll());
+    double pitch_ff = -Math.sin(pitch) * 1.5;
+
+    double MAX_PITCH_FF = 0.5;
+    if (pitch_ff > MAX_PITCH_FF) { pitch_ff = MAX_PITCH_FF; }
+    if (pitch_ff < -MAX_PITCH_FF) { pitch_ff = -MAX_PITCH_FF; }
+
     // The setpoints are in encoder ticks per second. We need to convert linear and angular
     // velocities to encoder ticks per second on each side of the drivetrain.
     double wheel_base_radius = wheel_base_width / 2;
@@ -432,11 +449,11 @@ public class Robot extends TimedRobot {
     double left_cmd_ff = left_setpoint / 7000.0;
     double right_cmd_ff = right_setpoint / 7000.0;
 
-    double left_cmd = left_cmd_ff - ang_cmd_fb + lin_cmd_fb;
-    double right_cmd = right_cmd_ff + ang_cmd_fb + lin_cmd_fb;
+    double left_cmd = left_cmd_ff - ang_cmd_fb + lin_cmd_fb + pitch_ff;
+    double right_cmd = right_cmd_ff + ang_cmd_fb + lin_cmd_fb + pitch_ff;
 
-    System.out.println("left_cmd" + left_cmd);
-    System.out.println("right_cmd" + right_cmd);
+//    System.out.println("left_cmd" + left_cmd);
+//    System.out.println("right_cmd" + right_cmd);
 
     differential_drive.tankDrive(left_cmd, right_cmd);
   }
