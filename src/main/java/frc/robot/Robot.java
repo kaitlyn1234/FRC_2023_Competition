@@ -78,7 +78,7 @@ public class Robot extends TimedRobot {
   final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.5;
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.4;
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
   final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
 
@@ -228,8 +228,7 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {
     m_autoSelected = m_chooser.getSelected();
     System.out.println("Auto selected: " + m_autoSelected);
-    autonomous_timer.reset();
-    autonomous_timer.start();
+
     drivetrain_mode = AutonomyMode.Start;
 
     ang_drivetrain_vel_pid.reset();
@@ -270,7 +269,7 @@ public class Robot extends TimedRobot {
       }
       else if (drivetrain_mode == AutonomyMode.PivotRaise) {
         grabber_arms.set(-0.1);
-        if (autonomy_timer.hasElapsed(2)) {
+        if (autonomy_timer.hasElapsed(2.5)) {
           drivetrain_mode = AutonomyMode.Extend;
           autonomy_timer.reset();
           autonomy_timer.start();
@@ -279,14 +278,14 @@ public class Robot extends TimedRobot {
           liftPivotPid(0.0);
         }
         else {
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(-0.1);
+          extensionPid(1.0);
+          grabberPivotPid(-0.075);
+          liftPivotPid(0.3);
         }
       }
       else if (drivetrain_mode == AutonomyMode.Extend) {
         grabber_arms.set(-0.1);
-        if (autonomy_timer.hasElapsed(2)) {
+        if (autonomy_timer.hasElapsed(0.5)) {
           drivetrain_mode = AutonomyMode.Drop;
           autonomy_timer.reset();
           autonomy_timer.start();
@@ -296,12 +295,12 @@ public class Robot extends TimedRobot {
         }
         else {
           extensionPid(1.0);
-          grabberPivotPid(0.0);
+          grabberPivotPid(-0.00);
           liftPivotPid(0.0);
         }
       }
       else if (drivetrain_mode == AutonomyMode.Drop) {
-        if (autonomy_timer.hasElapsed(1)) {
+        if (autonomy_timer.hasElapsed(0.5)) {
           drivetrain_mode = AutonomyMode.RetractExtension;
           autonomy_timer.reset();
           autonomy_timer.start();
@@ -319,7 +318,7 @@ public class Robot extends TimedRobot {
       }
       else if (drivetrain_mode == AutonomyMode.RetractExtension) {
         grabber_arms.set(0.0);
-        if (autonomy_timer.hasElapsed(2)) {
+        if (autonomy_timer.hasElapsed(0)) {
           drivetrain_mode = AutonomyMode.LowerPivot;
           autonomy_timer.reset();
           autonomy_timer.start();
@@ -328,32 +327,30 @@ public class Robot extends TimedRobot {
           liftPivotPid(0.0);
         }
         else {
-          extensionPid(-1.0);
-          grabberPivotPid(0.0);
+          extensionPid(0.0);
+          grabberPivotPid(0.00);
           liftPivotPid(0.0);
         }
       }
       else if (drivetrain_mode == AutonomyMode.LowerPivot) {
         grabber_arms.set(0.0);
-        if (autonomy_timer.hasElapsed(2)) {
+        if (autonomy_timer.hasElapsed(3.0)) {
           drivetrain_mode = AutonomyMode.DriveUp;
           autonomy_timer.reset();
           autonomy_timer.start();
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
+          grabber_pivot.set(0);
+          extension.set(0);
+          lift_pivot_group.set(0);
         }
         else {
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.1);
+          extensionPid(-1.25);
+          grabberPivotPid(0.1);
+          liftPivotPid(-0.2);
         }
       }
       else if (drivetrain_mode == AutonomyMode.DriveUp) {
-        System.out.println("EXECUTING DRIVEUP");
-        if (autonomous_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
+        if (autonomy_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
           drivetrain_mode = AutonomyMode.AutoLevel;
-          autonomy_timer.reset();
           differential_drive.tankDrive(0.0, 0.0);
         }
         else {
@@ -361,7 +358,6 @@ public class Robot extends TimedRobot {
         }
       }
       else if (drivetrain_mode == AutonomyMode.AutoLevel) {
-        System.out.println("EXECUTING AUTOLEVEL");
         autoLevel();
       }
       break;
@@ -464,8 +460,7 @@ public class Robot extends TimedRobot {
     drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
     turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
     
-    controlDrivetrain(-stick.getY(), -stick.getZ());
-    //differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
+    differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
   }
 
   public void autoLevel() {
@@ -492,7 +487,7 @@ public class Robot extends TimedRobot {
     if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
 
     // Control the drivetrain with these velocities
-    controlDrivetrain(-linear_velocity_setpoint, angular_velocity_setpoint);
+    controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
   }
 
   public void straightDrive(double lin_vel) {
