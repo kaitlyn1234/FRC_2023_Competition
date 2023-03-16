@@ -72,8 +72,9 @@ public class Robot extends TimedRobot {
   // Positional PID used for charge station alignment
   PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
 
-  Timer drive_up_timer = new Timer();
+  Timer autonomy_timer = new Timer();
   Timer autonomous_timer = new Timer();
+
   final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
@@ -120,15 +121,15 @@ public class Robot extends TimedRobot {
   final double grabber_pivot_max_setpoint = .2;
   final double lift_pivot_group_max_setpoint = .1;
   final double joystick_deadband_constant= .05;
-  final double extension_max_setpoint = .5;
+  final double extension_max_setpoint = 1.0;
 
   final double grabber_pivot_gear_ratio = 60 * 48;
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
-  enum DrivetrainMode { DriveUp, AutoLevel, Normal }
+  enum AutonomyMode { DriveUp, AutoLevel, Start, PivotRaise, Extend, Drop, RetractExtension, LowerPivot }
 
-  DrivetrainMode drivetrain_mode = DrivetrainMode.Normal;
+  AutonomyMode drivetrain_mode = AutonomyMode.Start;
 
   AHRS ahrs;
 
@@ -186,7 +187,7 @@ public class Robot extends TimedRobot {
       prev_yaw = current_yaw;      
     }, ANG_VELOCITY_CALCULATION_DT, 0.005);
 
-    drivetrain_mode = DrivetrainMode.Normal;
+    drivetrain_mode = AutonomyMode.Start;
     ang_drivetrain_vel_pid.reset();
     lin_drivetrain_vel_pid.reset();
   }
@@ -223,23 +224,13 @@ public class Robot extends TimedRobot {
     print_idx = print_idx + 1;
   }
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
   @Override
   public void autonomousInit() {
     m_autoSelected = m_chooser.getSelected();
     System.out.println("Auto selected: " + m_autoSelected);
     autonomous_timer.reset();
     autonomous_timer.start();
-    drivetrain_mode = DrivetrainMode.Normal;
+    drivetrain_mode = AutonomyMode.Start;
 
     ang_drivetrain_vel_pid.reset();
     lin_drivetrain_vel_pid.reset();
@@ -249,7 +240,6 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousPeriodic() {
-    grabber_arms.set(-0.1);
 
     switch (m_autoSelected) {
     case kCustomAuto:
@@ -270,25 +260,107 @@ public class Robot extends TimedRobot {
     case kDefaultAuto:
     default:
       //charging station
-      if (drivetrain_mode == DrivetrainMode.Normal) {
-        drive_up_timer.reset();
-        drive_up_timer.start();
+      if (drivetrain_mode == AutonomyMode.Start) {
+        grabber_arms.set(-0.1);
+        autonomy_timer.reset();
+        autonomy_timer.start();
 
-        drivetrain_mode = DrivetrainMode.DriveUp;
+        drivetrain_mode = AutonomyMode.PivotRaise;
         yaw_setpoint = Math.toRadians(ahrs.getYaw());
       }
-      else if (drivetrain_mode == DrivetrainMode.DriveUp) {
+      else if (drivetrain_mode == AutonomyMode.PivotRaise) {
+        grabber_arms.set(-0.1);
+        if (autonomy_timer.hasElapsed(2)) {
+          drivetrain_mode = AutonomyMode.Extend;
+          autonomy_timer.reset();
+          autonomy_timer.start();
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+        else {
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(-0.1);
+        }
+      }
+      else if (drivetrain_mode == AutonomyMode.Extend) {
+        grabber_arms.set(-0.1);
+        if (autonomy_timer.hasElapsed(2)) {
+          drivetrain_mode = AutonomyMode.Drop;
+          autonomy_timer.reset();
+          autonomy_timer.start();
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+        else {
+          extensionPid(1.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+      }
+      else if (drivetrain_mode == AutonomyMode.Drop) {
+        if (autonomy_timer.hasElapsed(1)) {
+          drivetrain_mode = AutonomyMode.RetractExtension;
+          autonomy_timer.reset();
+          autonomy_timer.start();
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+          grabber_arms.set(0.0);
+        }
+        else {
+          grabber_arms.set(0.1);
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+      }
+      else if (drivetrain_mode == AutonomyMode.RetractExtension) {
+        grabber_arms.set(0.0);
+        if (autonomy_timer.hasElapsed(2)) {
+          drivetrain_mode = AutonomyMode.LowerPivot;
+          autonomy_timer.reset();
+          autonomy_timer.start();
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+        else {
+          extensionPid(-1.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+      }
+      else if (drivetrain_mode == AutonomyMode.LowerPivot) {
+        grabber_arms.set(0.0);
+        if (autonomy_timer.hasElapsed(2)) {
+          drivetrain_mode = AutonomyMode.DriveUp;
+          autonomy_timer.reset();
+          autonomy_timer.start();
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.0);
+        }
+        else {
+          extensionPid(0.0);
+          grabberPivotPid(0.0);
+          liftPivotPid(0.1);
+        }
+      }
+      else if (drivetrain_mode == AutonomyMode.DriveUp) {
         System.out.println("EXECUTING DRIVEUP");
         if (autonomous_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
-          drivetrain_mode = DrivetrainMode.AutoLevel;
-          drive_up_timer.reset();
+          drivetrain_mode = AutonomyMode.AutoLevel;
+          autonomy_timer.reset();
           differential_drive.tankDrive(0.0, 0.0);
         }
         else {
-          differential_drive.tankDrive(0.77, 0.77);
+          differential_drive.tankDrive(-0.77, -0.77);
         }
       }
-      else if (drivetrain_mode == DrivetrainMode.AutoLevel) {
+      else if (drivetrain_mode == AutonomyMode.AutoLevel) {
         System.out.println("EXECUTING AUTOLEVEL");
         autoLevel();
       }
@@ -296,10 +368,9 @@ public class Robot extends TimedRobot {
     }
   }
 
-  /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
-    drivetrain_mode = DrivetrainMode.Normal;
+    drivetrain_mode = AutonomyMode.Start;
   }
   
   public double evaluatePolynomialDrive(double x) {
@@ -318,7 +389,18 @@ public class Robot extends TimedRobot {
     return a*x + b*java.lang.Math.pow(x, 2) + c*java.lang.Math.pow(x, 3);
   }
 
-  /** This function is called periodically during operator control. */
+  public void liftPivotPid(double setpoint) {
+    lift_pivot_group.set(lift_pivot_group_vel_pid.calculate(right_lift_motor.getEncoder().getVelocity() / lift_pivot_group_gear_ratio, setpoint));
+  }
+
+  public void extensionPid(double setpoint) {
+    extension.set(extension_vel_pid.calculate(extension.getEncoder().getVelocity() / extension_gear_ratio, setpoint));
+  }
+
+  public void grabberPivotPid(double setpoint) {
+    grabber_pivot.set(grabber_pivot_vel_pid.calculate (grabber_pivot.getEncoder(). getVelocity() / grabber_pivot_gear_ratio, setpoint));
+  }
+
   @Override
   public void teleopPeriodic()
   {
@@ -333,7 +415,7 @@ public class Robot extends TimedRobot {
       lift_pivot_group.set(0);
     }
     else {
-      lift_pivot_group.set(lift_pivot_group_vel_pid.calculate(right_lift_motor.getEncoder().getVelocity() / lift_pivot_group_gear_ratio, lift_pivot_group_setpoint));
+      liftPivotPid(lift_pivot_group_setpoint);
     }
 
     //  EXTENSION
@@ -346,7 +428,7 @@ public class Robot extends TimedRobot {
     if (extension.getMotorTemperature() > 100) {
       extension.set(0);
     } else {
-      extension.set(extension_vel_pid.calculate(extension.getEncoder().getVelocity() / extension_gear_ratio, extension_setpoint));
+      extensionPid(extension_setpoint);
     }
 
     // GRABBER PIVOT
@@ -359,8 +441,9 @@ public class Robot extends TimedRobot {
     if (grabber_pivot.getMotorTemperature() > 100) {
       grabber_pivot.set(0);
     } else {
-      grabber_pivot.set(grabber_pivot_vel_pid.calculate (grabber_pivot.getEncoder(). getVelocity() / grabber_pivot_gear_ratio, grabber_pivot_setpoint));
+      grabberPivotPid(grabber_pivot_setpoint);
     }
+
     // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
       grabber_arms.set(-0.1);
@@ -381,7 +464,8 @@ public class Robot extends TimedRobot {
     drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
     turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
     
-    differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
+    controlDrivetrain(-stick.getY(), -stick.getZ());
+    //differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
   }
 
   public void autoLevel() {
@@ -408,7 +492,7 @@ public class Robot extends TimedRobot {
     if (angular_velocity_setpoint < -AUTO_LEVEL_MAX_ANG_VEL) { angular_velocity_setpoint = -AUTO_LEVEL_MAX_ANG_VEL; }
 
     // Control the drivetrain with these velocities
-    controlDrivetrain(linear_velocity_setpoint, angular_velocity_setpoint);
+    controlDrivetrain(-linear_velocity_setpoint, angular_velocity_setpoint);
   }
 
   public void straightDrive(double lin_vel) {
@@ -461,27 +545,21 @@ public class Robot extends TimedRobot {
   }
 
 
-  /** This function is called once when the robot is disabled. */
   @Override
   public void disabledInit() {}
 
-  /** This function is called periodically when disabled. */
   @Override
   public void disabledPeriodic() {}
 
-  /** This function is called once when test mode is enabled. */
   @Override
   public void testInit() {}
 
-  /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {}
 
-  /** This function is called once when the robot is first started up. */
   @Override
   public void simulationInit() {}
 
-  /** This function is called periodically whilst in simulation. */
   @Override
   public void simulationPeriodic() {}
 }
