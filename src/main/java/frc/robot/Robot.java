@@ -245,13 +245,18 @@ public class Robot extends TimedRobot {
       //leave community
       if (drivetrain_mode == AutonomyMode.Start) {
         differential_drive.tankDrive(0.3, 0.3);
+        autonomy_timer.reset();
+        autonomy_timer.start();
         drivetrain_mode = AutonomyMode.community;
       }
-        else if (drivetrain_mode == AutonomyMode.community) {
-          if (autonomy_timer.hasElapsed(3.5)) {
-            differential_drive.tankDrive(0.0, 0.0);
-          }
+      else if (drivetrain_mode == AutonomyMode.community) {
+        if (autonomy_timer.hasElapsed(3.5)) {
+          differential_drive.tankDrive(0.0, 0.0);
         }
+        else {
+          differential_drive.tankDrive(0.3, 0.3);
+        }
+      }
       break;
 
     case kCustomAuto2:
