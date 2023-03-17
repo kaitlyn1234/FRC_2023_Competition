@@ -74,7 +74,6 @@ public class Robot extends TimedRobot {
 
   Timer autonomy_timer = new Timer();
   Timer autonomous_timer = new Timer();
-  Timer leave_comm_timer = new Timer ();
 
   final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
@@ -128,7 +127,7 @@ public class Robot extends TimedRobot {
   final double extension_gear_ratio = 60.0 * 27.35;
   final double lift_pivot_group_gear_ratio = 60 * 100;
 
-  enum AutonomyMode { DriveUp, AutoLevel, Start, PivotRaise, Extend, Drop, RetractExtension, LowerPivot }
+  enum AutonomyMode { DriveUp, AutoLevel, Start, PivotRaise, Extend, Drop, RetractExtension, LowerPivot, community }
 
   AutonomyMode drivetrain_mode = AutonomyMode.Start;
 
@@ -244,16 +243,15 @@ public class Robot extends TimedRobot {
     switch (m_autoSelected) {
     case kCustomAuto:
       //leave community
-      
-      if(leave_comm_timer.hasElapsed(3.5)) {
-        left_Motor_Group.set(0.0);
-        right_Motor_Group.set(0.0);
+      if (drivetrain_mode == AutonomyMode.Start) {
+        differential_drive.tankDrive(0.3, 0.3);
+        drivetrain_mode = AutonomyMode.community;
       }
-
-      else{
-        left_Motor_Group.set(0.2);
-        right_Motor_Group.set(0.2);
-      }
+        else if (drivetrain_mode == AutonomyMode.community) {
+          if (autonomy_timer.hasElapsed(3.5)) {
+            differential_drive.tankDrive(0.0, 0.0);
+          }
+        }
       break;
 
     case kCustomAuto2:
