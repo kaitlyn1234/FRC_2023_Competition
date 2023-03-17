@@ -74,6 +74,7 @@ public class Robot extends TimedRobot {
 
   Timer autonomy_timer = new Timer();
   Timer autonomous_timer = new Timer();
+  Timer leave_comm_timer = new Timer ();
 
   final double AUTO_DRIVE_UP_TIME = 1.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
@@ -121,7 +122,7 @@ public class Robot extends TimedRobot {
   final double grabber_pivot_max_setpoint = .2;
   final double lift_pivot_group_max_setpoint = .1;
   final double joystick_deadband_constant= .05;
-  final double extension_max_setpoint = 1.0;
+  final double extension_max_setpoint = 1.5;
 
   final double grabber_pivot_gear_ratio = 60 * 48;
   final double extension_gear_ratio = 60.0 * 27.35;
@@ -243,11 +244,15 @@ public class Robot extends TimedRobot {
     switch (m_autoSelected) {
     case kCustomAuto:
       //leave community
-      if (autonomous_timer.hasElapsed(3.5)) {
-        differential_drive.tankDrive(0.0, 0.0);
+      
+      if(leave_comm_timer.hasElapsed(3.5)) {
+        left_Motor_Group.set(0.0);
+        right_Motor_Group.set(0.0);
       }
-      else {
-        differential_drive.tankDrive(0.4, 0.4);
+
+      else{
+        left_Motor_Group.set(0.2);
+        right_Motor_Group.set(0.2);
       }
       break;
 
@@ -279,8 +284,8 @@ public class Robot extends TimedRobot {
         }
         else {
           extensionPid(1.0);
-          grabberPivotPid(-0.075);
-          liftPivotPid(0.3);
+          grabberPivotPid(-0.115);
+          liftPivotPid(0.25);
         }
       }
       else if (drivetrain_mode == AutonomyMode.Extend) {
@@ -300,7 +305,7 @@ public class Robot extends TimedRobot {
         }
       }
       else if (drivetrain_mode == AutonomyMode.Drop) {
-        if (autonomy_timer.hasElapsed(0.5)) {
+        if (autonomy_timer.hasElapsed(0.6)) {
           drivetrain_mode = AutonomyMode.RetractExtension;
           autonomy_timer.reset();
           autonomy_timer.start();
@@ -310,7 +315,7 @@ public class Robot extends TimedRobot {
           grabber_arms.set(0.0);
         }
         else {
-          grabber_arms.set(0.1);
+          grabber_arms.set(0.125);
           extensionPid(0.0);
           grabberPivotPid(0.0);
           liftPivotPid(0.0);
@@ -343,7 +348,7 @@ public class Robot extends TimedRobot {
           lift_pivot_group.set(0);
         }
         else {
-          extensionPid(-1.25);
+          extensionPid(-1.35);
           grabberPivotPid(0.1);
           liftPivotPid(-0.2);
         }
