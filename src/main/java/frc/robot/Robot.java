@@ -42,6 +42,7 @@ public class Robot extends TimedRobot {
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
+
   // DRIVE TRAIN MOTORS
   WPI_TalonSRX left_motor_front = new WPI_TalonSRX(4);
   WPI_TalonSRX right_motor_front = new WPI_TalonSRX(3);
@@ -54,6 +55,8 @@ public class Robot extends TimedRobot {
   CANSparkMax extension = new CANSparkMax(7, MotorType.kBrushless);;
   CANSparkMax grabber_pivot = new CANSparkMax(8, MotorType.kBrushless);;
   CANSparkMax grabber_arms = new CANSparkMax(9, MotorType.kBrushless);;
+  CANSparkMax grabber_spinny_left = new CANSparkMax(10,MotorType.kBrushless);;
+  CANSparkMax grabber_spinny_right = new CANSparkMax(11,MotorType.kBrushless);;
 
   PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
@@ -75,7 +78,7 @@ public class Robot extends TimedRobot {
   Timer autonomy_timer = new Timer();
   Timer autonomous_timer = new Timer();
 
-  final double AUTO_DRIVE_UP_TIME = 1.5;
+  final double AUTO_DRIVE_UP_TIME = 1.4;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
   final double AUTO_LEVEL_MAX_LIN_VEL = 0.4;
@@ -88,10 +91,11 @@ public class Robot extends TimedRobot {
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
   private final MotorControllerGroup lift_pivot_group = new MotorControllerGroup(right_lift_motor, left_lift_motor);
+  private final MotorControllerGroup spinny_Group = new MotorControllerGroup(grabber_spinny_right, grabber_spinny_left);
   DifferentialDrive differential_drive = new DifferentialDrive(left_Motor_Group, right_Motor_Group);
 
-  Joystick logitechController = new Joystick(0);
-  Joystick stick = new Joystick(1);
+  Joystick logitechController = new Joystick(1);
+  Joystick stick = new Joystick(2);
 
   final double VELOCITY_CALCULATION_DT = 0.1;
   final double ANG_VELOCITY_CALCULATION_DT = 0.02;
@@ -113,8 +117,10 @@ public class Robot extends TimedRobot {
   final int EXTENSION_BUTTON_OUT = 4;
   final int GRABBER_ARMS_BUTTON_OUT = 5;
   final int GRABBER_ARMS_BUTTON_IN = 6;
-  final int GRABBER_PIVOT_BUTTON_DOWN = 7;
-  final int GRABBER_PIVOT_BUTTON_UP = 8;
+ // final int GRABBER_PIVOT_BUTTON_DOWN = 7;
+ // final int GRABBER_PIVOT_BUTTON_UP = 8;
+  final int GRABBER_SPINNY_IN = 7;
+  final int GRABBER_SPINNY_OUT = 8;
 
   int print_idx = 0;
 
@@ -149,6 +155,7 @@ public class Robot extends TimedRobot {
 
     CameraServer.startAutomaticCapture();
     left_lift_motor.setInverted(true);
+    grabber_spinny_left.setInverted(true);
     SmartDashboard.putData("Auto choices", m_chooser);
     ahrs = new AHRS(SPI.Port.kMXP);
 
@@ -254,10 +261,11 @@ public class Robot extends TimedRobot {
           differential_drive.tankDrive(0.0, 0.0);
         }
         else {
-          differential_drive.tankDrive(0.3, 0.3);
+          differential_drive.tankDrive(0.4, 0.4);
         }
       }
       break;
+    
 
     case kCustomAuto2:
       //robot stays still
@@ -457,6 +465,18 @@ public class Robot extends TimedRobot {
     }
     else{
       grabber_arms.set(0);
+    }
+
+    // GRABBER SPINNY
+
+    if (logitechController.getRawButton(GRABBER_SPINNY_IN)) {
+      spinny_Group.set(-0.2);
+    }
+    else if (logitechController.getRawButton(GRABBER_SPINNY_OUT)) {
+      spinny_Group.set(0.2);
+    }
+    else{
+      spinny_Group.set(0);
     }
 
     double turn_raw = -stick.getZ();
