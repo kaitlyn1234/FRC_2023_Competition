@@ -18,6 +18,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.Joystick;
+
+import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup; 
@@ -25,6 +27,8 @@ import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.networktables.NetworkTableInstance.NetworkMode;
+
 import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.Timer;
@@ -36,9 +40,10 @@ import edu.wpi.first.wpilibj.Timer;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Charging Station";
-  private static final String kCustomAuto = "Leave Community";
-  private static final String kCustomAuto2 = "Nothing";
+  private static final String scoreAndLevelAuto = "Charging Station";
+  private static final String leaveCommunityAuto = "Leave Community";
+  private static final String doNothingAuto = "Nothing";
+  private static final String scoreAndLeaveAuto =  "Score and leave";
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
@@ -85,7 +90,8 @@ public class Robot extends TimedRobot {
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
   final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
 
-  final double MAX_PITCH_FF = 0.5;
+  final double MAX_PITCH_FF = 0.7;
+  final double PITCH_FF_GAIN = 1.7;
   final double DEADBAND_FF = 0.2;
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
@@ -111,18 +117,10 @@ public class Robot extends TimedRobot {
 
   double yaw_setpoint = 0;
 
-  final int LIFT_BUTTON_DOWN = 1;
-  final int LIFT_BUTTON_UP = 2;
-  final int EXTENSION_BUTTON_IN = 3;
-  final int EXTENSION_BUTTON_OUT = 4;
   final int GRABBER_ARMS_BUTTON_OUT = 5;
   final int GRABBER_ARMS_BUTTON_IN = 6;
- // final int GRABBER_PIVOT_BUTTON_DOWN = 7;
- // final int GRABBER_PIVOT_BUTTON_UP = 8;
   final int GRABBER_SPINNY_IN = 7;
   final int GRABBER_SPINNY_OUT = 8;
-
-  int print_idx = 0;
 
   final double grabber_pivot_max_setpoint = .2;
   final double lift_pivot_group_max_setpoint = .1;
@@ -139,15 +137,12 @@ public class Robot extends TimedRobot {
 
   AHRS ahrs;
 
-  /**
-   * This function is run when the robot is first started up and should be used for any
-   * initialization code.
-   */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Charging Station", kDefaultAuto);
-    m_chooser.addOption("Leave Community", kCustomAuto);
-    m_chooser.addOption("Nothing", kCustomAuto2);
+    m_chooser.setDefaultOption("Charging Station", scoreAndLevelAuto);
+    m_chooser.addOption("Leave Community", leaveCommunityAuto);
+    m_chooser.addOption("Nothing", doNothingAuto);
+    m_chooser.addOption("Score and leave", scoreAndLeaveAuto);
     SmartDashboard.putData("Auto choices", m_chooser);
 
 
@@ -223,12 +218,10 @@ public class Robot extends TimedRobot {
     // System.out.println("rpc " + right_lift_motor.getOutputCurrent());
     // System.out.println("lpc " + left_lift_motor.getOutputCurrent());
     // System.out.println("GPc " + grabber_pivot.getOutputCurrent());
-    if (print_idx % 25 == 0) {
-      System.out.println("exc " + extension.getOutputCurrent());
-    }
-    //System.out.println(ahrs.getRoll());
 
-    print_idx = print_idx + 1;
+    SmartDashboard.putNumber("extension_current", extension.getOutputCurrent());
+
+    //System.out.println(ahrs.getRoll());
   }
 
   @Override
@@ -248,7 +241,7 @@ public class Robot extends TimedRobot {
   public void autonomousPeriodic() {
 
     switch (m_autoSelected) {
-    case kCustomAuto:
+    case leaveCommunityAuto:
       //leave community
       if (drivetrain_mode == AutonomyMode.Start) {
         differential_drive.tankDrive(0.3, 0.3);
@@ -266,116 +259,19 @@ public class Robot extends TimedRobot {
       }
       break;
     
+    case scoreAndLeaveAuto:
+      scoreAndLeave();
+      break;
 
-    case kCustomAuto2:
+    case doNothingAuto:
       //robot stays still
       differential_drive.tankDrive(0.0, 0.0);
       break;
 
-    case kDefaultAuto:
+    case scoreAndLevelAuto:
     default:
       //charging station
-      if (drivetrain_mode == AutonomyMode.Start) {
-        grabber_arms.set(-0.1);
-        autonomy_timer.reset();
-        autonomy_timer.start();
-
-        drivetrain_mode = AutonomyMode.PivotRaise;
-        yaw_setpoint = Math.toRadians(ahrs.getYaw());
-      }
-      else if (drivetrain_mode == AutonomyMode.PivotRaise) {
-        grabber_arms.set(-0.1);
-        if (autonomy_timer.hasElapsed(2.5)) {
-          drivetrain_mode = AutonomyMode.Extend;
-          autonomy_timer.reset();
-          autonomy_timer.start();
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
-        }
-        else {
-          extensionPid(1.0);
-          grabberPivotPid(-0.115);
-          liftPivotPid(0.25);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.Extend) {
-        grabber_arms.set(-0.1);
-        if (autonomy_timer.hasElapsed(0.5)) {
-          drivetrain_mode = AutonomyMode.Drop;
-          autonomy_timer.reset();
-          autonomy_timer.start();
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
-        }
-        else {
-          extensionPid(1.0);
-          grabberPivotPid(-0.00);
-          liftPivotPid(0.0);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.Drop) {
-        if (autonomy_timer.hasElapsed(0.6)) {
-          drivetrain_mode = AutonomyMode.RetractExtension;
-          autonomy_timer.reset();
-          autonomy_timer.start();
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
-          grabber_arms.set(0.0);
-        }
-        else {
-          grabber_arms.set(0.125);
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.RetractExtension) {
-        grabber_arms.set(0.0);
-        if (autonomy_timer.hasElapsed(0)) {
-          drivetrain_mode = AutonomyMode.LowerPivot;
-          autonomy_timer.reset();
-          autonomy_timer.start();
-          extensionPid(0.0);
-          grabberPivotPid(0.0);
-          liftPivotPid(0.0);
-        }
-        else {
-          extensionPid(0.0);
-          grabberPivotPid(0.00);
-          liftPivotPid(0.0);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.LowerPivot) {
-        grabber_arms.set(0.0);
-        if (autonomy_timer.hasElapsed(3.0)) {
-          drivetrain_mode = AutonomyMode.DriveUp;
-          autonomy_timer.reset();
-          autonomy_timer.start();
-          grabber_pivot.set(0);
-          extension.set(0);
-          lift_pivot_group.set(0);
-        }
-        else {
-          extensionPid(-1.35);
-          grabberPivotPid(0.1);
-          liftPivotPid(-0.2);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.DriveUp) {
-        if (autonomy_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
-          drivetrain_mode = AutonomyMode.AutoLevel;
-          differential_drive.tankDrive(0.0, 0.0);
-        }
-        else {
-          differential_drive.tankDrive(-0.77, -0.77);
-        }
-      }
-      else if (drivetrain_mode == AutonomyMode.AutoLevel) {
-        autoLevel();
-      }
+      scoreAndAutoLevel();
       break;
     }
   }
@@ -459,21 +355,24 @@ public class Robot extends TimedRobot {
     // GRABBER ARMS
     if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_OUT)) {
       grabber_arms.set(-0.1);
+      
     }
     else if (logitechController.getRawButton(GRABBER_ARMS_BUTTON_IN)) {
       grabber_arms.set(0.2);
+   
     }
     else{
       grabber_arms.set(0);
+  
     }
 
     // GRABBER SPINNY
 
-    if (logitechController.getRawButton(GRABBER_SPINNY_IN)) {
-      spinny_Group.set(-0.2);
+    if (logitechController.getPOV(0) == 270) {
+     spinny_Group.set(0.5);
     }
-    else if (logitechController.getRawButton(GRABBER_SPINNY_OUT)) {
-      spinny_Group.set(0.2);
+    else if (logitechController.getPOV(0) == 90) {
+      spinny_Group.set(-0.3);
     }
     else{
       spinny_Group.set(0);
@@ -488,7 +387,33 @@ public class Robot extends TimedRobot {
     drive_cmd_scaled = java.lang.Math.copySign(drive_cmd_scaled, drive_raw);
     turn_cmd_scaled = java.lang.Math.copySign(turn_cmd_scaled, turn_raw);
     
-    differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
+    double pitch_ff = getPitchFF();
+    SmartDashboard.putNumber("pitch_ff", pitch_ff);
+
+    if (stick.getTrigger()) {
+      brakeMode();
+      SmartDashboard.putBoolean("trigger - brake", true);
+      differential_drive.arcadeDrive(drive_cmd_scaled + pitch_ff, turn_cmd_scaled);
+    }
+    else {
+      SmartDashboard.putBoolean("trigger - brake", false);
+      coastMode();
+      differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
+    }
+  }
+
+  public void brakeMode() {
+    right_motor_front.setNeutralMode(NeutralMode.Brake);
+    left_motor_front.setNeutralMode(NeutralMode.Brake);
+    right_motor_back.setNeutralMode(NeutralMode.Brake);
+    left_motor_back.setNeutralMode(NeutralMode.Brake);
+  }
+
+  public void coastMode() {
+    right_motor_front.setNeutralMode(NeutralMode.Coast);
+    left_motor_front.setNeutralMode(NeutralMode.Coast);
+    right_motor_back.setNeutralMode(NeutralMode.Coast);
+    left_motor_back.setNeutralMode(NeutralMode.Coast);
   }
 
   public void autoLevel() {
@@ -530,12 +455,17 @@ public class Robot extends TimedRobot {
     controlDrivetrain(lin_vel, angular_velocity_setpoint);
   }
 
-  public void controlDrivetrain(double linear_velocity, double angular_velocity) {
+  public double getPitchFF() {
     double pitch = Math.toRadians(ahrs.getRoll());
-    double pitch_ff = -Math.sin(pitch) * 1.5;
+    double pitch_ff = -Math.sin(pitch) * PITCH_FF_GAIN;
 
     if (pitch_ff > MAX_PITCH_FF) { pitch_ff = MAX_PITCH_FF; }
     if (pitch_ff < -MAX_PITCH_FF) { pitch_ff = -MAX_PITCH_FF; }
+    return pitch_ff;
+  }
+
+  public void controlDrivetrain(double linear_velocity, double angular_velocity) {
+    double pitch_ff = getPitchFF();
 
     // The setpoints are in encoder ticks per second. We need to convert linear and angular
     // velocities to encoder ticks per second on each side of the drivetrain.
@@ -567,6 +497,212 @@ public class Robot extends TimedRobot {
     differential_drive.tankDrive(left_cmd, right_cmd);
   }
 
+  public void scoreAndLeave() {
+    if (drivetrain_mode == AutonomyMode.Start) {
+      grabber_arms.set(-0.1);
+      autonomy_timer.reset();
+      autonomy_timer.start();
+
+      drivetrain_mode = AutonomyMode.PivotRaise;
+      yaw_setpoint = Math.toRadians(ahrs.getYaw());
+    }
+    else if (drivetrain_mode == AutonomyMode.PivotRaise) {
+      grabber_arms.set(-0.1);
+      if (autonomy_timer.hasElapsed(2.5)) {
+        drivetrain_mode = AutonomyMode.Extend;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(1.0);
+        grabberPivotPid(-0.115);
+        liftPivotPid(0.25);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.Extend) {
+      grabber_arms.set(-0.1);
+      if (autonomy_timer.hasElapsed(0.5)) {
+        drivetrain_mode = AutonomyMode.Drop;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(1.0);
+        grabberPivotPid(-0.00);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.Drop) {
+      if (autonomy_timer.hasElapsed(0.6)) {
+        drivetrain_mode = AutonomyMode.RetractExtension;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+        grabber_arms.set(0.0);
+      }
+      else {
+        grabber_arms.set(0.125);
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.RetractExtension) {
+      grabber_arms.set(0.0);
+      if (autonomy_timer.hasElapsed(0)) {
+        drivetrain_mode = AutonomyMode.LowerPivot;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(0.0);
+        grabberPivotPid(0.00);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.LowerPivot) {
+      grabber_arms.set(0.0);
+      if (autonomy_timer.hasElapsed(3.0)) {
+        drivetrain_mode = AutonomyMode.DriveUp;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        grabber_pivot.set(0);
+        extension.set(0);
+        lift_pivot_group.set(0);
+      }
+      else {
+        extensionPid(-1.35);
+        grabberPivotPid(0.1);
+        liftPivotPid(-0.2);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.DriveUp) {
+      if (autonomy_timer.hasElapsed(2.0)) {
+        differential_drive.tankDrive(0.0, 0.0);
+      }
+      else {
+        differential_drive.tankDrive(-0.5, -0.5);
+      }
+    }
+  }
+
+  public void scoreAndAutoLevel() {
+    if (drivetrain_mode == AutonomyMode.Start) {
+      grabber_arms.set(-0.1);
+      autonomy_timer.reset();
+      autonomy_timer.start();
+
+      drivetrain_mode = AutonomyMode.PivotRaise;
+      yaw_setpoint = Math.toRadians(ahrs.getYaw());
+    }
+    else if (drivetrain_mode == AutonomyMode.PivotRaise) {
+      grabber_arms.set(-0.1);
+      if (autonomy_timer.hasElapsed(2.5)) {
+        drivetrain_mode = AutonomyMode.Extend;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(1.0);
+        grabberPivotPid(-0.115);
+        liftPivotPid(0.25);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.Extend) {
+      grabber_arms.set(-0.1);
+      if (autonomy_timer.hasElapsed(0.5)) {
+        drivetrain_mode = AutonomyMode.Drop;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(1.0);
+        grabberPivotPid(-0.00);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.Drop) {
+      if (autonomy_timer.hasElapsed(0.6)) {
+        drivetrain_mode = AutonomyMode.RetractExtension;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+        grabber_arms.set(0.0);
+      }
+      else {
+        grabber_arms.set(0.125);
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.RetractExtension) {
+      grabber_arms.set(0.0);
+      if (autonomy_timer.hasElapsed(0)) {
+        drivetrain_mode = AutonomyMode.LowerPivot;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.0);
+      }
+      else {
+        extensionPid(0.0);
+        grabberPivotPid(0.00);
+        liftPivotPid(0.0);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.LowerPivot) {
+      grabber_arms.set(0.0);
+      if (autonomy_timer.hasElapsed(2.0)) {
+        drivetrain_mode = AutonomyMode.DriveUp;
+        autonomy_timer.reset();
+        autonomy_timer.start();
+      }
+      else {
+        extensionPid(-1.35);
+        grabberPivotPid(0.1);
+        liftPivotPid(-0.2);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.DriveUp) {
+      if (autonomy_timer.hasElapsed(AUTO_DRIVE_UP_TIME)) {
+        drivetrain_mode = AutonomyMode.AutoLevel;
+        differential_drive.tankDrive(0.0, 0.0);
+        grabber_pivot.set(0);
+        extension.set(0);
+        lift_pivot_group.set(0);
+      }
+      else {
+        differential_drive.tankDrive(-0.77, -0.77);
+        extensionPid(-1.35);
+        grabberPivotPid(0.1);
+        liftPivotPid(-0.2);
+      }
+    }
+    else if (drivetrain_mode == AutonomyMode.AutoLevel) {
+      autoLevel();
+    }
+  }
 
   @Override
   public void disabledInit() {}
