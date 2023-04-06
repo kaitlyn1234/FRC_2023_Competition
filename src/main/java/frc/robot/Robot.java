@@ -90,8 +90,8 @@ public class Robot extends TimedRobot {
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
   final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
 
-  final double MAX_PITCH_FF = 0.7;
-  final double PITCH_FF_GAIN = 1.7;
+  final double MAX_PITCH_FF = 0.6;
+  final double PITCH_FF_GAIN = 1.5;
   final double DEADBAND_FF = 0.2;
 
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
@@ -508,7 +508,7 @@ public class Robot extends TimedRobot {
     }
     else if (drivetrain_mode == AutonomyMode.PivotRaise) {
       grabber_arms.set(-0.1);
-      if (autonomy_timer.hasElapsed(2.5)) {
+      if (autonomy_timer.hasElapsed(3)) {
         drivetrain_mode = AutonomyMode.Extend;
         autonomy_timer.reset();
         autonomy_timer.start();
@@ -516,15 +516,24 @@ public class Robot extends TimedRobot {
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
       }
-      else {
-        extensionPid(1.0);
+      else if (autonomous_timer.hasElapsed(0.5)) {
+        extensionPid(0.2);//2.5
         grabberPivotPid(-0.115);
-        liftPivotPid(0.25);
+        liftPivotPid(0.18);
+        grabber_spinny_left.set(0.05);
+        grabber_spinny_right.set(0.05);
+      }
+      else {
+        extensionPid(0.2);//1
+        grabber_spinny_left.set(0.05);
+        grabber_spinny_right.set(0.05);
+        grabberPivotPid(-0.115);
+        liftPivotPid(0.18);
       }
     }
     else if (drivetrain_mode == AutonomyMode.Extend) {
       grabber_arms.set(-0.1);
-      if (autonomy_timer.hasElapsed(0.5)) {
+      if (autonomy_timer.hasElapsed(0.2)) {//.5
         drivetrain_mode = AutonomyMode.Drop;
         autonomy_timer.reset();
         autonomy_timer.start();
@@ -533,7 +542,7 @@ public class Robot extends TimedRobot {
         liftPivotPid(0.0);
       }
       else {
-        extensionPid(1.0);
+        extensionPid(0.2);//1
         grabberPivotPid(-0.00);
         liftPivotPid(0.0);
       }
@@ -550,6 +559,8 @@ public class Robot extends TimedRobot {
       }
       else {
         grabber_arms.set(0.125);
+        grabber_spinny_left.set(-0.2);
+        grabber_spinny_right.set(-0.2);
         extensionPid(0.0);
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
@@ -573,7 +584,7 @@ public class Robot extends TimedRobot {
     }
     else if (drivetrain_mode == AutonomyMode.LowerPivot) {
       grabber_arms.set(0.0);
-      if (autonomy_timer.hasElapsed(3.0)) {
+      if (autonomy_timer.hasElapsed(2.5)) {
         drivetrain_mode = AutonomyMode.DriveUp;
         autonomy_timer.reset();
         autonomy_timer.start();
@@ -582,13 +593,13 @@ public class Robot extends TimedRobot {
         lift_pivot_group.set(0);
       }
       else {
-        extensionPid(-1.35);
+        extensionPid(-2.5);
         grabberPivotPid(0.1);
-        liftPivotPid(-0.2);
+        liftPivotPid(-0.3);
       }
     }
     else if (drivetrain_mode == AutonomyMode.DriveUp) {
-      if (autonomy_timer.hasElapsed(2.0)) {
+      if (autonomy_timer.hasElapsed(7.0)) {// 2 
         differential_drive.tankDrive(0.0, 0.0);
       }
       else {
@@ -616,10 +627,19 @@ public class Robot extends TimedRobot {
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
       }
-      else {
-        extensionPid(1.0);
+      else if (autonomous_timer.hasElapsed(0.5)) {
+        extensionPid(2.5);
         grabberPivotPid(-0.115);
-        liftPivotPid(0.25);
+        liftPivotPid(0.18);
+        grabber_spinny_left.set(0.05);
+        grabber_spinny_right.set(0.05);
+      }
+      else {
+        extensionPid(-1.0);
+        grabberPivotPid(-0.115);
+        liftPivotPid(0.18);
+        grabber_spinny_left.set(0.05);
+        grabber_spinny_right.set(0.05);
       }
     }
     else if (drivetrain_mode == AutonomyMode.Extend) {
@@ -650,6 +670,8 @@ public class Robot extends TimedRobot {
       }
       else {
         grabber_arms.set(0.125);
+        grabber_spinny_left.set(-0.2);
+        grabber_spinny_right.set(-0.2);
         extensionPid(0.0);
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
@@ -673,15 +695,15 @@ public class Robot extends TimedRobot {
     }
     else if (drivetrain_mode == AutonomyMode.LowerPivot) {
       grabber_arms.set(0.0);
-      if (autonomy_timer.hasElapsed(2.0)) {
+      if (autonomy_timer.hasElapsed(1.5)) {
         drivetrain_mode = AutonomyMode.DriveUp;
         autonomy_timer.reset();
         autonomy_timer.start();
       }
       else {
-        extensionPid(-1.35);
-        grabberPivotPid(0.1);
-        liftPivotPid(-0.2);
+        extensionPid(-2.5);
+        grabberPivotPid(0.15);
+        liftPivotPid(-0.3);
       }
     }
     else if (drivetrain_mode == AutonomyMode.DriveUp) {
@@ -693,9 +715,11 @@ public class Robot extends TimedRobot {
         lift_pivot_group.set(0);
       }
       else {
-        differential_drive.tankDrive(-0.77, -0.77);
-        extensionPid(-1.35);
-        grabberPivotPid(0.1);
+        differential_drive.tankDrive(-0.85, -0.85);//77
+        extensionPid(0.0);
+        //grabberPivotPid(0.1);
+        grabber_pivot.set(0);
+        //lift_pivot_group.set(0);
         liftPivotPid(-0.2);
       }
     }
