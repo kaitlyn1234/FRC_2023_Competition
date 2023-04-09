@@ -60,8 +60,6 @@ public class Robot extends TimedRobot {
   CANSparkMax extension = new CANSparkMax(7, MotorType.kBrushless);;
   CANSparkMax grabber_pivot = new CANSparkMax(8, MotorType.kBrushless);;
   CANSparkMax grabber_arms = new CANSparkMax(9, MotorType.kBrushless);;
-  CANSparkMax grabber_spinny_left = new CANSparkMax(10,MotorType.kBrushless);;
-  CANSparkMax grabber_spinny_right = new CANSparkMax(11,MotorType.kBrushless);;
 
   PIDController extension_vel_pid = new PIDController(0.15, 0.25, 0.0);
   PIDController lift_pivot_group_vel_pid = new PIDController(1.1, 2.0, 0.0);
@@ -78,15 +76,15 @@ public class Robot extends TimedRobot {
   PIDController drivetrain_yaw_pos_pid = new PIDController(2.0, 0.0, 0.0);
 
   // Positional PID used for charge station alignment
-  PIDController drivetrain_leveling_pid = new PIDController(0.10, 0.00, 0.0);
+  PIDController drivetrain_leveling_pid = new PIDController(0.35, 0.00, 0.0);
 
   Timer autonomy_timer = new Timer();
   Timer autonomous_timer = new Timer();
 
-  final double AUTO_DRIVE_UP_TIME = 1.4;
+  final double AUTO_DRIVE_UP_TIME = 0.5;
   final double AUTO_DRIVE_UP_VEL = 0.75;
 
-  final double AUTO_LEVEL_MAX_LIN_VEL = 0.4;
+  final double AUTO_LEVEL_MAX_LIN_VEL = 0.6;
   final double AUTO_LEVEL_MAX_ANG_VEL = 2;
   final double AUTO_LEVEL_DEADBAND_ANG = 3.0; 
 
@@ -97,7 +95,6 @@ public class Robot extends TimedRobot {
   private final MotorControllerGroup right_Motor_Group = new MotorControllerGroup(right_motor_front, right_motor_back);
   private final MotorControllerGroup left_Motor_Group = new MotorControllerGroup(left_motor_front, left_motor_back);
   private final MotorControllerGroup lift_pivot_group = new MotorControllerGroup(right_lift_motor, left_lift_motor);
-  private final MotorControllerGroup spinny_Group = new MotorControllerGroup(grabber_spinny_right, grabber_spinny_left);
   DifferentialDrive differential_drive = new DifferentialDrive(left_Motor_Group, right_Motor_Group);
 
   Joystick logitechController = new Joystick(1);
@@ -150,7 +147,6 @@ public class Robot extends TimedRobot {
 
     CameraServer.startAutomaticCapture();
     left_lift_motor.setInverted(true);
-    grabber_spinny_left.setInverted(true);
     SmartDashboard.putData("Auto choices", m_chooser);
     ahrs = new AHRS(SPI.Port.kMXP);
 
@@ -366,18 +362,6 @@ public class Robot extends TimedRobot {
   
     }
 
-    // GRABBER SPINNY
-
-    if (logitechController.getPOV(0) == 270) {
-     spinny_Group.set(0.5);
-    }
-    else if (logitechController.getPOV(0) == 90) {
-      spinny_Group.set(-0.3);
-    }
-    else{
-      spinny_Group.set(0);
-    }
-
     double turn_raw = -stick.getZ();
     double drive_raw = -stick.getY();
 
@@ -399,6 +383,7 @@ public class Robot extends TimedRobot {
       SmartDashboard.putBoolean("trigger - brake", false);
       coastMode();
       differential_drive.arcadeDrive(drive_cmd_scaled, turn_cmd_scaled);
+      //controlDrivetrain(drive_cmd_scaled, turn_cmd_scaled);
     }
   }
 
@@ -520,13 +505,10 @@ public class Robot extends TimedRobot {
         extensionPid(0.2);//2.5
         grabberPivotPid(-0.115);
         liftPivotPid(0.18);
-        grabber_spinny_left.set(0.05);
-        grabber_spinny_right.set(0.05);
+
       }
       else {
         extensionPid(0.2);//1
-        grabber_spinny_left.set(0.05);
-        grabber_spinny_right.set(0.05);
         grabberPivotPid(-0.115);
         liftPivotPid(0.18);
       }
@@ -559,8 +541,6 @@ public class Robot extends TimedRobot {
       }
       else {
         grabber_arms.set(0.125);
-        grabber_spinny_left.set(-0.2);
-        grabber_spinny_right.set(-0.2);
         extensionPid(0.0);
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
@@ -619,7 +599,7 @@ public class Robot extends TimedRobot {
     }
     else if (drivetrain_mode == AutonomyMode.PivotRaise) {
       grabber_arms.set(-0.1);
-      if (autonomy_timer.hasElapsed(2.5)) {
+      if (autonomy_timer.hasElapsed(1.0)) {
         drivetrain_mode = AutonomyMode.Extend;
         autonomy_timer.reset();
         autonomy_timer.start();
@@ -627,24 +607,15 @@ public class Robot extends TimedRobot {
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
       }
-      else if (autonomous_timer.hasElapsed(0.5)) {
-        extensionPid(2.5);
-        grabberPivotPid(-0.115);
-        liftPivotPid(0.18);
-        grabber_spinny_left.set(0.05);
-        grabber_spinny_right.set(0.05);
-      }
       else {
-        extensionPid(-1.0);
-        grabberPivotPid(-0.115);
-        liftPivotPid(0.18);
-        grabber_spinny_left.set(0.05);
-        grabber_spinny_right.set(0.05);
+        extensionPid(0.0);
+        grabberPivotPid(0.0);
+        liftPivotPid(0.3);
       }
     }
     else if (drivetrain_mode == AutonomyMode.Extend) {
       grabber_arms.set(-0.1);
-      if (autonomy_timer.hasElapsed(0.5)) {
+      if (autonomy_timer.hasElapsed(2.0)) {
         drivetrain_mode = AutonomyMode.Drop;
         autonomy_timer.reset();
         autonomy_timer.start();
@@ -654,8 +625,8 @@ public class Robot extends TimedRobot {
       }
       else {
         extensionPid(1.0);
-        grabberPivotPid(-0.00);
-        liftPivotPid(0.0);
+        grabberPivotPid(-0.115);
+        liftPivotPid(0.18);
       }
     }
     else if (drivetrain_mode == AutonomyMode.Drop) {
@@ -670,8 +641,6 @@ public class Robot extends TimedRobot {
       }
       else {
         grabber_arms.set(0.125);
-        grabber_spinny_left.set(-0.2);
-        grabber_spinny_right.set(-0.2);
         extensionPid(0.0);
         grabberPivotPid(0.0);
         liftPivotPid(0.0);
@@ -716,11 +685,9 @@ public class Robot extends TimedRobot {
       }
       else {
         differential_drive.tankDrive(-0.85, -0.85);//77
-        extensionPid(0.0);
-        //grabberPivotPid(0.1);
-        grabber_pivot.set(0);
-        //lift_pivot_group.set(0);
-        liftPivotPid(-0.2);
+        extensionPid(-1.0);
+        grabberPivotPid(0.1);
+        liftPivotPid(-0.3);
       }
     }
     else if (drivetrain_mode == AutonomyMode.AutoLevel) {
